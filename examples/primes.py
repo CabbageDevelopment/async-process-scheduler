@@ -26,8 +26,8 @@ from typing import List, Tuple
 import numpy as np
 from numpy import ndarray
 
-from Scheduler import Scheduler
-from Task import Task
+from scheduler.Scheduler import Scheduler
+from scheduler.Task import Task
 
 
 def calc_primes(numbers: ndarray) -> ndarray:
@@ -70,8 +70,7 @@ async def coro_run():
         data[i, :] = np.arange(i + 2, upper_limit + 2, num_tasks)
 
         queue = Queue()
-        process = Process(target=mp_calc_primes,
-                          args=(data[i, :], queue,))
+        process = Process(target=mp_calc_primes, args=(data[i, :], queue))
 
         scheduler.add_task(Task(process, queue))
 
