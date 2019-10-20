@@ -28,7 +28,7 @@ from scheduler.utils import terminate_tree
 class Task:
     """
     A simple class containing a process and an associated queue. The queue should have been
-    passed to the process, the process should put its output in the queue.
+    passed to the process, so that the process can put its output in the queue.
     """
 
     def __init__(self, process: Process, queue: Queue, subtasks=0):

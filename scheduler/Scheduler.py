@@ -39,16 +39,34 @@ class Scheduler:
     concurrently and an 8-core, 16-thread CPU will run 17 processes
     concurrently.
 
-    If CPU usage is found to be below the threshold, the number of
-    simultaneous processes will be increased. CPU usage is checked
-    every 5 seconds.
+    If `dynamic` is enabled, Scheduler will also check CPU usage and increase
+    the number of processes if it is below the threshold.
     """
 
     def __init__(
-        self,
-        progress_callback: Callable[[int, int], None] = None,
-        delay_seconds: float = 0.05,
+            self,
+            progress_callback: Callable[[int, int], None] = None,
+            update_interval: float = 0.05,
+            dynamic: bool = True,
+            cpu_threshold: float = 95,
+            cpu_update_interval: float = 5,
     ):
+        """
+        :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
+        called when a task finishes
+
+        :param update_interval: the time between consecutive updates (when tasks are checked and new tasks are scheduled)
+
+        :param dynamic: whether to dynamically increase the number of processes based on the CPU usage
+
+        :param cpu_threshold: the minimum target CPU usage, in percent; if `dynamic` is enabled and CPU usage is found
+        to be below the threshold, the number of simultaneous tasks will be increased
+
+        :param cpu_update_interval: the time, in seconds, between consecutive CPU usage checks when `dynamic` is enabled
+        """
+        self.dynamic = dynamic
+        self.update_interval = update_interval
+
         self.tasks: List[Task] = []
         self.output: List[tuple] = []
 
@@ -61,29 +79,24 @@ class Scheduler:
         # List of currently running tasks.
         self.running_tasks: List[Task] = []
 
-        # The delay between each consecutive check for finished tasks.
-        self.delay_seconds = delay_seconds
-        self.delay_millis = int(delay_seconds * 1000)
-
         self.time_start: float = 0
         self.started = False
-        self.stopped = False
         self.terminated = False
 
         # Most recent time at which CPU utilisation was checked.
         self.time_cpu_checked: float = 0
 
         # Number of seconds between CPU utilisation checks.
-        self.time_between_cpu_checks: float = 5
+        self.time_between_cpu_checks: float = cpu_update_interval
 
         # If the CPU utilisation in percent is below the threshold, more tasks will be run.
-        self.cpu_threshold = 95
+        self.cpu_threshold = cpu_threshold
 
         self.total_task_count: int = 0
         self.tasks_completed: int = 0
 
         # Callback which allows the Scheduler to report its progress;
-        # the 1st input is the number of completed tasks, while the 2nd is
+        # the 1st input is the number of completed tasks, and the 2nd is
         # the total number of tasks.
         self.progress_callback: Callable[[int, int], None] = progress_callback
 
@@ -92,37 +105,70 @@ class Scheduler:
         Adds a task to the Scheduler.
         """
         if self.started:
-            raise SchedulerException("Do not add tasks to an running Scheduler.")
+            raise SchedulerException("add_task() cannot be called on a running Scheduler.")
 
         self.tasks.append(task)
 
+    def add_tasks(self, *args: Task) -> None:
+        """
+        Adds multiple tasks to the Scheduler.
+        """
+        if self.started:
+            raise SchedulerException("add_tasks() cannot be called on a running Scheduler.")
+
+        self.tasks.extend(args)
+
     async def run(self) -> List[tuple]:
         """
-        Runs the tasks with coroutines. Returns a list containing
-        the output of each task, after all tasks are complete.
+        Runs the tasks with coroutines.
 
-        Important: the list is not ordered. Each task should return some
-        form of identifier in its results; for example, the name of the
-        signal.
+        :returns an ordered list containing the output of each task
         """
-        # Initialize `self.output` so that it can be indexed into.
-        self.output = [() for _ in self.tasks]
-        self.start()
+        self._initialize_output()
+        self._start()
 
-        while not self.stopped and not self.all_tasks_finished():
-            await asyncio.sleep(self.delay_seconds)
-            self.update()
+        while not self.terminated and not self._all_tasks_finished():
+            await asyncio.sleep(self.update_interval)
+            self._update()
 
         return self.output
 
-    def update(self):
-        should_update_tasks = False
+    def run_blocking(self) -> List[tuple]:
+        """
+        Runs the tasks. Will block the current thread until all tasks are complete.
+
+        :returns an ordered list containing the output of each task
+        """
+        self._initialize_output()
+        self._start()
+
+        while not self.terminated and not self._all_tasks_finished():
+            time.sleep(self.update_interval)
+            self._update()
+
+        return self.output
+
+    def terminate(self) -> None:
+        """Terminates all running tasks by killing their processes."""
+        if not self.terminated:
+            [t.terminate() for t in self.tasks]
+            self.terminated = True
+
+    def _initialize_output(self) -> None:
+        # Initialize `self.output` so that it can be indexed into.
+        self.output = [None for _ in self.tasks]
+
+    def _update(self) -> None:
+        """
+        Checks whether tasks have finished, and schedules new tasks if applicable.
+        """
+        schedule_new_tasks = False
 
         t = time.time()
-        if t - self.time_cpu_checked > self.time_between_cpu_checks:
+        if self.dynamic and t - self.time_cpu_checked > self.time_between_cpu_checks:
             self.time_cpu_checked = t
             total_remaining_tasks = sum(
-                [t.total_tasks() for t in self.available_tasks()]
+                [t.total_tasks() for t in self._available_tasks()]
             )
 
             if total_remaining_tasks > self.concurrent_count:
@@ -135,7 +181,7 @@ class Scheduler:
                         new_count += 1
 
                     self.concurrent_count = new_count
-                    should_update_tasks = True
+                    schedule_new_tasks = True
 
         for t in self.running_tasks:
             t.update()
@@ -143,83 +189,66 @@ class Scheduler:
                 index = self.tasks.index(t)
                 self.output[index] = t.queue.get()
 
-                self.on_task_completed(t)
-                should_update_tasks = True
+                self._on_task_completed(t)
+                schedule_new_tasks = True
 
-        if should_update_tasks:
-            self.schedule_tasks()
+        if schedule_new_tasks:
+            self._schedule_tasks()
 
-    def start(self):
-        """Starts the scheduler running the assigned tasks."""
+    def _start(self) -> None:
+        """
+        Starts the scheduler running its tasks.
+        """
         self.started = True
         self.total_task_count = sum([t.total_tasks() for t in self.tasks])
 
         self.time_start = time.time()
         self.time_cpu_checked = self.time_start
-        self.report_progress(0)
+        self._report_progress(0)
 
-        self.schedule_tasks()
+        self._schedule_tasks()
 
-    def schedule_tasks(self):
+    def _schedule_tasks(self) -> None:
         """Updates the currently running tasks by starting new tasks if necessary."""
-        tasks = self.tasks_to_run()
+        tasks = self._tasks_to_run()
         self.running_tasks.extend(tasks)
         [t.start() for t in tasks]
 
-    def terminate(self):
-        """Terminates all running tasks by killing their processes."""
-        if not (self.terminated or self.stopped):
-            [t.terminate() for t in self.tasks]
-            self.terminated = True
-            self.stop_timer()
-
-    def stop_timer(self):
-        """
-        Stops the timer from checking whether tasks have finished.
-        This should be called when all tasks have been completed.
-        """
-        if not self.stopped:
-            self.stopped = True
-
-    def on_task_completed(self, task):
+    def _on_task_completed(self, task) -> None:
         """Called when a task finishes."""
-        self.report_progress(task.total_tasks())
+        self._report_progress(task.total_tasks())
         self.running_tasks.remove(task)
 
-    def on_all_tasks_completed(self):
-        """Called when all assigned tasks have been completed."""
-        self.stop_timer()
-
-    def report_progress(self, tasks_just_finished: int):
+    def _report_progress(self, tasks_just_finished: int) -> None:
         self.tasks_completed += tasks_just_finished
         if self.progress_callback:
             self.progress_callback(self.tasks_completed, self.total_task_count)
 
-    def available_tasks(self) -> List[Task]:
+    def _available_tasks(self) -> List[Task]:
         """Gets all tasks which are available to run."""
         return [t for t in self.tasks if not (t.running or t.finished)]
 
-    def all_tasks_finished(self) -> bool:
+    def _all_tasks_finished(self) -> bool:
         """Returns whether all tasks have been finished."""
         return all([t.finished for t in self.tasks])
 
-    def total_running_tasks(self) -> int:
+    def _total_running_tasks(self) -> int:
         """Returns the total number of running tasks, including sub-tasks."""
         running = self.running_tasks
         return sum([t.total_tasks() for t in running])
 
-    def tasks_to_run(self) -> List[Task]:
+    def _tasks_to_run(self) -> List[Task]:
         """
         Gets the tasks that should be run, based on the core count
         and the current number of running tasks.
         """
         # Number of remaining tasks to run.
-        available = self.available_tasks()
+        available = self._available_tasks()
 
         # The total number of tasks (including sub-tasks) for each available task.
         task_counts = [t.total_tasks() for t in available]
 
-        running_count = self.total_running_tasks()
+        running_count = self._total_running_tasks()
 
         # Number of tasks that can be started without reducing efficiency.
         num_to_run = self.concurrent_count - running_count
