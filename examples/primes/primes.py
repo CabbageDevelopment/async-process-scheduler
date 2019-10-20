@@ -20,6 +20,7 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 import asyncio
+import os
 from multiprocessing import Queue, Process
 from typing import List, Tuple
 
@@ -57,7 +58,7 @@ def on_progress(done, total):
 
 async def coro_run():
     num_tasks = 32
-    nums_per_task = int(100_000 // num_tasks)
+    nums_per_task = 100_000 // num_tasks
 
     # Choose so that each row of the Numpy array is the same length.
     upper_limit = num_tasks * nums_per_task
@@ -85,11 +86,13 @@ async def coro_run():
 
     # Now that we have the results, we could show them in the GUI. For simplicity, let's print them.
     print(primes)
+    os._exit(0)
 
 
 async def coro_sleep():
-    # Note: time.sleep() would block the main thread and Scheduler would be unable to run.
-    await asyncio.sleep(1e5)
+    while True:
+        print("Other code can still run on the main thread.")
+        await asyncio.sleep(5)
 
 
 if __name__ == "__main__":
