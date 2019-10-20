@@ -32,17 +32,19 @@ with open(path.join(here, "README.md"), encoding="utf-8") as f:
 setup(
     name="AsyncProcessScheduler",
 
-    version="0.1.0",
+    version="0.1.0b1",
 
     packages=["scheduler"],
     python_requires='~=3.6',
     install_requires=["psutil"],
 
-    description="Library for scheduling processes using coroutines.",
+    description="GUI-friendly library for scheduling processes using coroutines.",
     long_description=long_description,
     long_description_content_type='text/markdown',
     
     url="https://github.com/CabbageDevelopment/async-process-scheduler",
+    author="Sam McCormack",
+    author_email="contact@cabbagedevelopment.com",
 
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -56,6 +58,6 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
 
-    keywords="async asyncio processing multiprocessing scheduler scheduling processes",
+    keywords="async asyncio processing multiprocessing scheduler scheduling processes coroutines gui",
     project_urls={"Source": "https://github.com/CabbageDevelopment/async-process-scheduler"},
 )
