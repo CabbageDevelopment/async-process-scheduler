@@ -1,7 +1,8 @@
 # Async Process Scheduler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![PyPI version](https://badge.fury.io/py/AsyncProcessScheduler.svg)](https://badge.fury.io/py/AsyncProcessScheduler)
+[![PyPI](https://img.shields.io/pypi/v/AsyncProcessScheduler)](https://pypi.org/project/AsyncProcessScheduler)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/AsyncProcessScheduler)
 
 *Current status: BETA. Improved documentation coming soon.*
 
