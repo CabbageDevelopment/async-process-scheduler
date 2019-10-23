@@ -22,7 +22,7 @@
 
 import asyncio
 import time
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Process, Queue
 from typing import List, Callable
 
 import psutil
@@ -100,6 +100,13 @@ class Scheduler:
         # the total number of tasks.
         self.progress_callback: Callable[[int, int], None] = progress_callback
 
+    def add(self, process: Process, queue: Queue):
+        """
+        Creates a task from a process and queue, and adds it to the scheduler.
+        """
+        task = Task(process, queue)
+        self.add_task(task)
+
     def add_task(self, task: Task) -> None:
         """
         Adds a task to the Scheduler.
@@ -120,7 +127,7 @@ class Scheduler:
 
     async def run(self) -> List[tuple]:
         """
-        Runs the tasks with coroutines.
+        Runs the tasks in a coroutine.
 
         :returns an ordered list containing the output of each task
         """
