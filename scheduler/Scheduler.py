@@ -81,6 +81,7 @@ class Scheduler:
 
         self.time_start: float = 0
         self.started = False
+        self.finished = False
         self.terminated = False
 
         # Most recent time at which CPU utilisation was checked.
@@ -100,11 +101,14 @@ class Scheduler:
         # the total number of tasks.
         self.progress_callback: Callable[[int, int], None] = progress_callback
 
-    def add(self, process: Process, queue: Queue):
+    def add(self, process: Process, queue: Queue, subtasks: int = 0) -> None:
         """
         Creates a task from a process and queue, and adds it to the scheduler.
         """
-        task = Task(process, queue)
+        if self.started:
+            raise SchedulerException("add() cannot be called on a Scheduler which has already been started.")
+
+        task = Task(process, queue, subtasks)
         self.add_task(task)
 
     def add_task(self, task: Task) -> None:
@@ -112,7 +116,7 @@ class Scheduler:
         Adds a task to the Scheduler.
         """
         if self.started:
-            raise SchedulerException("add_task() cannot be called on a running Scheduler.")
+            raise SchedulerException("add_task() cannot be called on a Scheduler which has already been started.")
 
         self.tasks.append(task)
 
@@ -121,7 +125,7 @@ class Scheduler:
         Adds multiple tasks to the Scheduler.
         """
         if self.started:
-            raise SchedulerException("add_tasks() cannot be called on a running Scheduler.")
+            raise SchedulerException("add_tasks() cannot be called on a Scheduler which has already been started.")
 
         self.tasks.extend(args)
 
@@ -131,6 +135,8 @@ class Scheduler:
 
         :returns an ordered list containing the output of each task
         """
+        if self.started:
+            raise SchedulerException("Scheduler has already been started.")
         self._initialize_output()
         self._start()
 
@@ -138,6 +144,7 @@ class Scheduler:
             await asyncio.sleep(self.update_interval)
             self._update()
 
+        self.finished = True
         return self.output
 
     def run_blocking(self) -> List[tuple]:
@@ -146,6 +153,9 @@ class Scheduler:
 
         :returns an ordered list containing the output of each task
         """
+        if self.started:
+            raise SchedulerException("Scheduler has already been started.")
+
         self._initialize_output()
         self._start()
 
@@ -153,6 +163,7 @@ class Scheduler:
             time.sleep(self.update_interval)
             self._update()
 
+        self.finished = True
         return self.output
 
     def terminate(self) -> None:
@@ -160,6 +171,10 @@ class Scheduler:
         if not self.terminated:
             [t.terminate() for t in self.tasks]
             self.terminated = True
+
+    def is_running(self) -> bool:
+        """:returns whether the scheduler is running."""
+        return self.started and not self.finished and not self.terminated
 
     def _initialize_output(self) -> None:
         # Initialize `self.output` so that it can be indexed into.
