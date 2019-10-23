@@ -31,7 +31,7 @@ class Task:
     passed to the process, so that the process can put its output in the queue.
     """
 
-    def __init__(self, process: Process, queue: Queue, subtasks=0):
+    def __init__(self, process: Process, queue: Queue, subtasks: int = 0):
         self.process = process
         self.queue = queue
 
