@@ -71,7 +71,7 @@ class Scheduler:
         self.output: List[tuple] = []
 
         # Minimum number of tasks to run concurrently.
-        self.min_concurrent_count: int = cpu_count() + 1
+        self.min_concurrent_count: int = self.optimal_process_count()
 
         # The actual number of tasks may be adjusted dynamically to improve efficiency.
         self.concurrent_count: int = self.min_concurrent_count
@@ -175,6 +175,13 @@ class Scheduler:
     def is_running(self) -> bool:
         """:returns whether the scheduler is running."""
         return self.started and not self.finished and not self.terminated
+
+    @staticmethod
+    def optimal_process_count() -> int:
+        """
+        :returns the optimal number of processes based on the number of logical processors.
+        """
+        return cpu_count() + 1
 
     def _initialize_output(self) -> None:
         # Initialize `self.output` so that it can be indexed into.
