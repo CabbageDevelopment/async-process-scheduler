@@ -133,16 +133,20 @@ class Scheduler:
         """
         Runs the tasks in a coroutine.
 
-        :returns an ordered list containing the output of each task
+        :returns an ordered list containing the output of each task if complete, or an empty list if terminated
         """
         if self.started:
             raise SchedulerException("Scheduler has already been started.")
+
         self._initialize_output()
         self._start()
 
         while not self.terminated and not self._all_tasks_finished():
             await asyncio.sleep(self.update_interval)
             self._update()
+
+        if self.terminated:
+            return []
 
         self.finished = True
         return self.output
@@ -151,7 +155,7 @@ class Scheduler:
         """
         Runs the tasks. Will block the current thread until all tasks are complete.
 
-        :returns an ordered list containing the output of each task
+        :returns an ordered list containing the output of each task if complete, or an empty list if terminated
         """
         if self.started:
             raise SchedulerException("Scheduler has already been started.")
@@ -162,6 +166,9 @@ class Scheduler:
         while not self.terminated and not self._all_tasks_finished():
             time.sleep(self.update_interval)
             self._update()
+
+        if self.terminated:
+            return []
 
         self.finished = True
         return self.output
