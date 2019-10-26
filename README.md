@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![PyPI](https://img.shields.io/pypi/v/AsyncProcessScheduler)](https://pypi.org/project/AsyncProcessScheduler)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/AsyncProcessScheduler)
+[![Build Status](https://travis-ci.org/CabbageDevelopment/async-process-scheduler.svg?branch=master)](https://travis-ci.org/CabbageDevelopment/async-process-scheduler)
 
 *Current status: beta.*
 
