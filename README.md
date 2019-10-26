@@ -71,3 +71,16 @@ asyncio.ensure_future(run())
 This diagram demonstrates the implementation of `Scheduler`.
 
 ![Image demonstrating the design of Scheduler.](/docs/images/scheduler.png)
+
+## Developer notes
+
+### Packaging the project
+
+From the [documentation](https://packaging.python.org/guides/distributing-packages-using-setuptools/#packaging-your-project):
+
+```
+rm -r dist/
+python setup.py sdist
+python setup.py bdist_wheel
+twine upload dist/*
+```
