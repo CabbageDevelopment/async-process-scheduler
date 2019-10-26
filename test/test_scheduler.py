@@ -19,22 +19,25 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
+import asyncio
 import time
 from multiprocessing import Process, Queue
+from typing import List, Tuple
 
 from scheduler.Scheduler import Scheduler
 from scheduler.Task import Task
 
 
-def long_task():
+def long_task(queue: Queue, _time: int = 1):
     """Pretends to be a long task."""
-    time.sleep(1)
+    time.sleep(_time)
+    queue.put((1, 2, 3))
 
 
 def get_process_and_queue(target, *args):
     """Returns a process and a queue for testing."""
     queue = Queue()
-    return Process(target=long_task, args=(queue,) + tuple(args)), queue
+    return Process(target=target, args=(queue,) + tuple(args)), queue
 
 
 def test_add():
@@ -101,3 +104,37 @@ def test_add_tasks():
         assert tasks[i] is t
         if i < count - 1:
             assert tasks[i + 1] is not t
+
+
+def test_terminate():
+    """Tests whether the scheduler returns the correct result - an empty list - when terminated."""
+    scheduler = Scheduler()
+    count = 10
+
+    async def run_scheduler():
+        # Create a lot of processes which take 100 seconds each.
+        for i in range(count):
+            scheduler.add(*get_process_and_queue(long_task, 100))
+
+        # This will take a while. While running, it will be terminated by the other coroutine.
+        results: List[Tuple] = await scheduler.run()
+
+        # Check that an empty list is returned when terminated.
+        return scheduler.terminated and isinstance(results, list) and len(results) == 0
+
+    async def do_run():
+        await asyncio.sleep(1)
+
+        result = await asyncio.gather(run_scheduler(), terminate())
+        success = result and result[0]
+
+        return success
+
+    async def terminate():
+        await asyncio.sleep(1)
+        scheduler.terminate()
+
+    loop = asyncio.get_event_loop()
+    success = loop.run_until_complete(do_run())
+
+    assert success
