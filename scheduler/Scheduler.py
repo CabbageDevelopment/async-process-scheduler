@@ -21,9 +21,11 @@
 #  SOFTWARE.
 
 import asyncio
+import functools
+import multiprocessing
 import time
 from multiprocessing import cpu_count, Process, Queue
-from typing import List, Callable
+from typing import List, Callable, Type
 
 import psutil
 
@@ -44,12 +46,12 @@ class Scheduler:
     """
 
     def __init__(
-            self,
-            progress_callback: Callable[[int, int], None] = None,
-            update_interval: float = 0.05,
-            dynamic: bool = True,
-            cpu_threshold: float = 95,
-            cpu_update_interval: float = 5,
+        self,
+        progress_callback: Callable[[int, int], None] = None,
+        update_interval: float = 0.05,
+        dynamic: bool = True,
+        cpu_threshold: float = 95,
+        cpu_update_interval: float = 5,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -101,22 +103,56 @@ class Scheduler:
         # the total number of tasks.
         self.progress_callback: Callable[[int, int], None] = progress_callback
 
-    def add(self, process: Process, queue: Queue, subtasks: int = 0) -> None:
+    def add_process(self, process: Process, queue: Queue, subtasks: int = 0) -> None:
         """
         Creates a task from a process and queue, and adds it to the scheduler.
         """
         if self.started:
-            raise SchedulerException("add() cannot be called on a Scheduler which has already been started.")
+            raise SchedulerException(
+                "add() cannot be called on a Scheduler which has already been started."
+            )
 
         task = Task(process, queue, subtasks)
-        self.add_task(task)
+        self.tasks.append(task)
+
+    def add(
+        self,
+        target: Callable,
+        args: tuple,
+        subtasks: int = 0,
+        process_type: Type = multiprocessing.Process,
+        queue_type: Type = multiprocessing.Queue,
+    ) -> None:
+        """
+        Creates a task from a normal function which directly returns output.
+
+        :param target: the function to run in another process
+        :param args: the arguments for the function as a tuple
+        :param subtasks: the number of subtasks
+        :param process_type: the type of process; you can specify another type such as `multiprocess.Process`
+        :param queue_type: the type of queue; you can specify another type such as `multiprocess.Queue`
+        """
+        if self.started:
+            raise SchedulerException(
+                "add_function() cannot be called on a scheduler which has already been started."
+            )
+
+        queue = queue_type()
+
+        _args = (queue,) + args
+        _wrapper = functools.partial(wrapper, target)
+
+        process = process_type(target=_wrapper, args=_args)
+        self.tasks.append(Task(process, queue, subtasks=subtasks))
 
     def add_task(self, task: Task) -> None:
         """
         Adds a task to the Scheduler.
         """
         if self.started:
-            raise SchedulerException("add_task() cannot be called on a Scheduler which has already been started.")
+            raise SchedulerException(
+                "add_task() cannot be called on a Scheduler which has already been started."
+            )
 
         self.tasks.append(task)
 
@@ -125,7 +161,9 @@ class Scheduler:
         Adds multiple tasks to the Scheduler.
         """
         if self.started:
-            raise SchedulerException("add_tasks() cannot be called on a Scheduler which has already been started.")
+            raise SchedulerException(
+                "add_tasks() cannot be called on a Scheduler which has already been started."
+            )
 
         self.tasks.extend(args)
 
@@ -302,3 +340,11 @@ class Scheduler:
             final_task_index += 1
 
         return available[:final_task_index]
+
+
+def wrapper(function: Callable, queue: Queue, *args):
+    """
+    Wrapper which calls a function with its specified arguments and puts the output in a queue.
+    """
+    result: tuple = function(*args)
+    queue.put(result)

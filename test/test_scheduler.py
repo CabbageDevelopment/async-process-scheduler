@@ -65,6 +65,63 @@ def test_add():
             assert tasks[i + 1].queue is not t.queue
 
 
+def test_add_function():
+    """Tests whether `add_function()` works correctly."""
+    scheduler = Scheduler()
+
+    count = 50
+    expected = []
+
+    for i in range(count):
+        _args = (i, i + 2, i + 5)
+        expected.append(_func(*_args))
+
+        scheduler.add_function(target=_func, args=_args)
+
+    results: List[Tuple[int, int, int]] = scheduler.run_blocking()
+    assert len(results) == count
+
+    for i in range(len(results)):
+        assert expected[i] == results[i]
+
+        if i < count - 1:
+            assert expected[i] != results[i + 1]
+
+
+def _func(x, y, z):
+    return x ** 2, y ** 3, z ** 4
+
+
+def _funcq(queue, x, y, z):
+    queue.put((x ** 2, y ** 3, z ** 4))
+
+
+def test_run_blocking():
+    """Tests whether `run_blocking()` works correctly."""
+    scheduler = Scheduler()
+
+    count = 50
+    expected = []
+
+    for i in range(count):
+        q = Queue()
+
+        _args = (q, i, i + 2, i + 5)
+        expected.append(_func(*_args[1:]))
+
+        p = Process(target=_funcq, args=_args)
+        scheduler.add(p, q)
+
+    results: List[Tuple[int, int, int]] = scheduler.run_blocking()
+    assert len(results) == count
+
+    for i in range(len(results)):
+        assert expected[i] == results[i]
+
+        if i < count - 1:
+            assert expected[i] != results[i + 1]
+
+
 def test_add_task():
     """Tests whether tasks are added to the scheduler correctly with `add_task()`."""
     scheduler = Scheduler()
@@ -138,3 +195,7 @@ def test_terminate():
     success = loop.run_until_complete(do_run())
 
     assert success
+
+
+if __name__ == "__main__":
+    test_add_function()
