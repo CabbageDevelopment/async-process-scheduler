@@ -21,9 +21,10 @@
 #  SOFTWARE.
 
 """
-Demonstrates the usage of Scheduler in a simple PyQt program, which shows progress and output.
+Demonstrates the usage of Scheduler in a simple PyQt program which shows progress and output.
 
-Dependencies are in `requirements.txt`. To install them, run `pip install -r requirements.txt --user`.
+Dependencies are in `requirements.txt`. To install them, run `pip install -r requirements.txt --user`
+in this directory.
 """
 
 import asyncio
@@ -48,15 +49,14 @@ from scheduler.Scheduler import Scheduler
 
 def long_calculation(sleep_time: int) -> Tuple[int]:
     """
-    Will be executed in another process. Simulates a long calculation,
-    and puts the 'result' in the queue.
+    Will be executed in another process. Simulates a long calculation, and returns the 'result'.
     """
     time.sleep(sleep_time)
     return (sleep_time,)
 
 
 class Window(QWidget):
-    """Basic Window class."""
+    """Basic window class."""
 
     def __init__(self):
         super().__init__()
@@ -77,7 +77,9 @@ class Window(QWidget):
         self.scheduler: Scheduler = None
 
     def on_click(self):
-        """Called when the button is clicked."""
+        """
+        Called when the button is clicked.
+        """
         if self.scheduler is None or not self.scheduler.is_running():
             # "Start" was clicked. Start the coroutine which runs the scheduler.
             asyncio.ensure_future(self.do_calculations())
@@ -89,7 +91,9 @@ class Window(QWidget):
             self.progress.setValue(0)
 
     async def do_calculations(self):
-        """Does the calculations using a scheduler, and shows the output in the label."""
+        """
+        Does the calculations using a scheduler, and shows the output in the label.
+        """
         self.scheduler = Scheduler(progress_callback=self.on_progress)
 
         num_processes = 16
@@ -108,13 +112,17 @@ class Window(QWidget):
             self.button.setText("Start")
 
     def on_progress(self, done: int, total: int) -> None:
-        """Updates the progress bar when scheduler finishes a task."""
+        """
+        Updates the progress bar when scheduler finishes a task.
+        """
         if done == 0:
             self.progress.setMaximum(total)
         self.progress.setValue(done)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
-        """Terminates the scheduler when the window exits."""
+        """
+        Terminates the scheduler when the window exits.
+        """
         if self.scheduler:
             self.scheduler.terminate()
 
@@ -129,4 +137,5 @@ if __name__ == "__main__":
     window = Window()
     window.show()
 
-    app.exec()
+    with loop:
+        sys.exit(loop.run_forever())

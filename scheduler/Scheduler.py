@@ -56,14 +56,10 @@ class Scheduler:
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
         called when a task finishes
-
         :param update_interval: the time between consecutive updates (when tasks are checked and new tasks are scheduled)
-
         :param dynamic: whether to dynamically increase the number of processes based on the CPU usage
-
         :param cpu_threshold: the minimum target CPU usage, in percent; if `dynamic` is enabled and CPU usage is found
         to be below the threshold, the number of simultaneous tasks will be increased
-
         :param cpu_update_interval: the time, in seconds, between consecutive CPU usage checks when `dynamic` is enabled
         """
         self.dynamic = dynamic
