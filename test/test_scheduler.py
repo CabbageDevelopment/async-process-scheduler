@@ -20,147 +20,134 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 import asyncio
-import time
 from multiprocessing import Process, Queue
 from typing import List, Tuple
 
+import multiprocess
+
 from scheduler.Scheduler import Scheduler
 from scheduler.Task import Task
+from test.utils import _long_task, _get_input_output, assert_results, _func, _funcq
 
 
-def long_task(queue: Queue, _time: int = 1):
-    """Pretends to be a long task."""
-    time.sleep(_time)
-    queue.put((1, 2, 3))
-
-
-def get_process_and_queue(target, *args):
-    """Returns a process and a queue for testing."""
-    queue = Queue()
-    return Process(target=target, args=(queue,) + tuple(args)), queue
-
-
-def test_add():
+def test_add_process():
     """Tests whether tasks are added to the scheduler correctly with `add()`."""
     scheduler = Scheduler()
 
-    count = 100
-    tasks = []
+    args, expected = _get_input_output()
+    for a in args:
+        q = Queue()
+        p = Process(target=_funcq, args=(q,) + a)
 
-    for i in range(count):
-        p, q = get_process_and_queue(long_task)
-        scheduler.add(p, q)
-
-        task = Task(p, q)
-        tasks.append(task)
-
-    for i in range(len(scheduler.tasks)):
-        t = scheduler.tasks[i]
-
-        assert tasks[i].process is t.process
-        assert tasks[i].queue is t.queue
-
-        if i < count - 1:
-            assert tasks[i + 1].process is not t.process
-            assert tasks[i + 1].queue is not t.queue
-
-
-def test_add_function():
-    """Tests whether `add_function()` works correctly."""
-    scheduler = Scheduler()
-
-    count = 50
-    expected = []
-
-    for i in range(count):
-        _args = (i, i + 2, i + 5)
-        expected.append(_func(*_args))
-
-        scheduler.add_function(target=_func, args=_args)
+        scheduler.add_process(p, q)
 
     results: List[Tuple[int, int, int]] = scheduler.run_blocking()
-    assert len(results) == count
+    assert_results(expected, results)
 
-    for i in range(len(results)):
-        assert expected[i] == results[i]
-
-        if i < count - 1:
-            assert expected[i] != results[i + 1]
+    assert scheduler.finished
 
 
-def _func(x, y, z):
-    return x ** 2, y ** 3, z ** 4
+def test_add():
+    """Tests whether `add()` works correctly."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output()
+    for a in args:
+        scheduler.add(target=_func, args=a)
+
+    results: List[Tuple[int, int, int]] = scheduler.run_blocking()
+    assert_results(expected, results)
+
+    assert scheduler.finished
 
 
-def _funcq(queue, x, y, z):
-    queue.put((x ** 2, y ** 3, z ** 4))
+def test_multiprocess():
+    """Tests whether `add()` works correctly with `multiprocess` instead of `multiprocessing`."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output()
+    for a in args:
+        scheduler.add(
+            target=_func,
+            args=a,
+            process_type=multiprocess.Process,
+            queue_type=multiprocess.Queue,
+        )
+
+    results: List[Tuple[int, int, int]] = scheduler.run_blocking()
+    assert_results(expected, results)
+
+    assert scheduler.finished
 
 
 def test_run_blocking():
     """Tests whether `run_blocking()` works correctly."""
     scheduler = Scheduler()
 
-    count = 50
-    expected = []
-
-    for i in range(count):
+    args, expected = _get_input_output()
+    for a in args:
         q = Queue()
-
-        _args = (q, i, i + 2, i + 5)
-        expected.append(_func(*_args[1:]))
-
-        p = Process(target=_funcq, args=_args)
-        scheduler.add(p, q)
+        p = Process(target=_funcq, args=(q,) + a)
+        scheduler.add_process(p, q)
 
     results: List[Tuple[int, int, int]] = scheduler.run_blocking()
-    assert len(results) == count
+    assert_results(expected, results)
 
-    for i in range(len(results)):
-        assert expected[i] == results[i]
+    assert scheduler.finished
 
-        if i < count - 1:
-            assert expected[i] != results[i + 1]
+
+def test_run_async():
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output()
+    for a in args:
+        scheduler.add(target=_func, args=a)
+
+    loop = asyncio.get_event_loop()
+
+    results: List[Tuple[int, int, int]] = loop.run_until_complete(scheduler.run())
+    assert_results(expected, results)
+
+    assert scheduler.finished
 
 
 def test_add_task():
     """Tests whether tasks are added to the scheduler correctly with `add_task()`."""
     scheduler = Scheduler()
 
-    count = 100
-    tasks = []
+    args, expected = _get_input_output()
+    for a in args:
+        q = Queue()
+        p = Process(target=_funcq, args=(q,) + a)
 
-    for i in range(count):
-        p, q = get_process_and_queue(long_task)
         task = Task(p, q)
-        tasks.append(task)
         scheduler.add_task(task)
 
-    for i in range(len(scheduler.tasks)):
-        t = scheduler.tasks[i]
-        assert tasks[i] is t
-        if i < count - 1:
-            assert tasks[i + 1] is not t
+    results: List[Tuple[int, int, int]] = scheduler.run_blocking()
+    assert_results(expected, results)
+
+    assert scheduler.finished
 
 
 def test_add_tasks():
     """Tests whether tasks are added to the scheduler correctly with `add_tasks()`."""
     scheduler = Scheduler()
-
-    count = 100
     tasks = []
 
-    for i in range(count):
-        p, q = get_process_and_queue(long_task)
+    args, expected = _get_input_output()
+    for a in args:
+        q = Queue()
+        p = Process(target=_funcq, args=(q,) + a)
+
         task = Task(p, q)
         tasks.append(task)
 
     scheduler.add_tasks(*tasks)
 
-    for i in range(len(scheduler.tasks)):
-        t = scheduler.tasks[i]
-        assert tasks[i] is t
-        if i < count - 1:
-            assert tasks[i + 1] is not t
+    results: List[Tuple[int, int, int]] = scheduler.run_blocking()
+    assert_results(expected, results)
+
+    assert scheduler.finished
 
 
 def test_terminate():
@@ -171,7 +158,7 @@ def test_terminate():
     async def run_scheduler():
         # Create a lot of processes which take 100 seconds each.
         for i in range(count):
-            scheduler.add(*get_process_and_queue(long_task, 100))
+            scheduler.add(target=_long_task, args=(100,))
 
         # This will take a while. While running, it will be terminated by the other coroutine.
         results: List[Tuple] = await scheduler.run()
@@ -195,7 +182,9 @@ def test_terminate():
     success = loop.run_until_complete(do_run())
 
     assert success
+    assert not scheduler.finished
 
 
 if __name__ == "__main__":
-    test_add_function()
+    test_run_async()
+    test_terminate()
