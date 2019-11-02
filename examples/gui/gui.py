@@ -30,23 +30,29 @@ import asyncio
 import random
 import sys
 import time
-from multiprocessing import Queue, Process
 from typing import List, Tuple
 
 import asyncqt
 from PyQt5 import QtGui
-from PyQt5.QtWidgets import QApplication, QLabel, QProgressBar, QVBoxLayout, QWidget, QPushButton
+from PyQt5.QtWidgets import (
+    QApplication,
+    QLabel,
+    QProgressBar,
+    QVBoxLayout,
+    QWidget,
+    QPushButton,
+)
 
 from scheduler.Scheduler import Scheduler
 
 
-def long_calculation(queue: Queue, sleep_time: int) -> None:
+def long_calculation(sleep_time: int) -> Tuple[int]:
     """
     Will be executed in another process. Simulates a long calculation,
     and puts the 'result' in the queue.
     """
     time.sleep(sleep_time)
-    queue.put((sleep_time,))
+    return (sleep_time,)
 
 
 class Window(QWidget):
@@ -90,10 +96,7 @@ class Window(QWidget):
         for i in range(num_processes):
             # Generate random input for function.
             sleep = random.randint(1, 8)
-
-            queue = Queue()
-            process = Process(target=long_calculation, args=(queue, sleep,))
-            self.scheduler.add(process, queue)
+            self.scheduler.add(target=long_calculation, args=(sleep,))
 
         # Run all processes and `await` the results: an ordered list containing one tuple from each process.
         output: List[Tuple] = await self.scheduler.run()
