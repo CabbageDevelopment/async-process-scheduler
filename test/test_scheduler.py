@@ -27,7 +27,14 @@ import multiprocess
 
 from scheduler.Scheduler import Scheduler
 from scheduler.Task import Task
-from test.utils import _long_task, _get_input_output, assert_results, _func, _funcq
+from test.utils import (
+    _long_task,
+    _get_input_output,
+    assert_results,
+    _func,
+    _funcq,
+    _func_no_params,
+)
 
 
 def test_add_process():
@@ -57,6 +64,23 @@ def test_add():
 
     results: List[Tuple[int, int, int]] = scheduler.run_blocking()
     assert_results(expected, results)
+
+    assert scheduler.finished
+
+
+def test_run_no_params():
+    """Tests whether `run()` works correctly on a function with no parameters."""
+    scheduler = Scheduler()
+
+    expected = _func_no_params()
+    for a in range(50):
+        scheduler.add(target=_func_no_params)
+
+    loop = asyncio.get_event_loop()
+    results: List = loop.run_until_complete(scheduler.run())
+
+    for r in results:
+        assert r == expected
 
     assert scheduler.finished
 
@@ -97,6 +121,7 @@ def test_run_blocking():
 
 
 def test_run_async():
+    """Tests whether `run()` works correctly."""
     scheduler = Scheduler()
 
     args, expected = _get_input_output()
@@ -104,8 +129,8 @@ def test_run_async():
         scheduler.add(target=_func, args=a)
 
     loop = asyncio.get_event_loop()
-
     results: List[Tuple[int, int, int]] = loop.run_until_complete(scheduler.run())
+
     assert_results(expected, results)
 
     assert scheduler.finished

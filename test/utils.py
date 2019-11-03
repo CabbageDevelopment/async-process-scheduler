@@ -55,6 +55,10 @@ def assert_results(expected, results):
             assert expected[i] != results[i + 1]
 
 
+def _func_no_params() -> float:
+    return 3.1415
+
+
 def _func(x, y, z) -> Tuple:
     return x ** 2, y ** 3, z ** 4
 
