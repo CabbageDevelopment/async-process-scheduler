@@ -114,7 +114,7 @@ class Scheduler:
     def add(
         self,
         target: Callable,
-        args: tuple,
+        args: tuple = (),
         subtasks: int = 0,
         process_type: Type = multiprocessing.Process,
         queue_type: Type = multiprocessing.Queue,
