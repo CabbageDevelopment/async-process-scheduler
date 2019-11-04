@@ -172,6 +172,10 @@ scheduler.add_process(process, queue)
 
 > :warning: When adding processes, ensure that the queue instance passed to the function is the same as the queue added to the scheduler. Also take care that the function puts its output in the queue instead of returning it.
 
+#### Sub-tasks
+
+The functions above take an optional `subtasks` parameter. `subtasks` is used to hint to the scheduler that each process may create its own processes; this will be taken into account when scheduling processes.
+
 ### Running a scheduler
 
 When a scheduler runs, it will run all tasks until complete and then return an ordered list containing the output from each task.
@@ -196,11 +200,13 @@ To cancel a scheduler, use `terminate()`:
 scheduler.terminate()
 ```
 
+A terminated scheduler will always return an empty list.
+
 ## Design
 
 When the scheduler starts, it will simultaneously run a number of processes up to the value returned by `Scheduler.optimal_process_count()`. When a process finishes, another is started to take its place.
 
-If `dynamic` is enabled, the scheduler will check the CPU usage periodically and increase the number of concurrent processes if it below the threshold.
+If `dynamic` is enabled, the scheduler will check the CPU usage periodically and increase the number of concurrent processes if the CPU usage is below the threshold.
 
 This diagram demonstrates the implementation of `Scheduler`:
 
