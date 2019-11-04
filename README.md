@@ -13,14 +13,14 @@ Async Process Scheduler is a small Python library which provides a simple, GUI-f
 
 Async Process Scheduler is compatible with `multiprocessing` from the standard library, and equivalent implementations such as `multiprocess`.
 
-> Note: To use Async Process Scheduler in a GUI program, you'll need a library which implements a compatible event loop. For example, [asyncqt](https://github.com/gmarull/asyncqt) can be used with PyQt5.
+> **Note:** To use Async Process Scheduler in a GUI program, you'll need a library which implements a compatible event loop. For example, [qasync](https://github.com/CabbageDevelopment/qasync) can be used with PyQt5.
 
 ## Installation
 
 To install Async Process Scheduler, use `pip`:
 
 ```
-pip install AsyncProcessScheduler --user
+pip install AsyncProcessScheduler
 ```
 
 ## Example
@@ -58,7 +58,7 @@ loop = asyncio.get_event_loop()
 loop.run_until_complete(run())
 ```
 
-> Note: GUI programs would use `asyncio.ensure_future(run())` to start the coroutine without blocking.
+> **Note:** GUI programs would use `asyncio.ensure_future(run())` to start the coroutine without blocking.
 
 ## Quick guide
 
@@ -172,6 +172,12 @@ scheduler.add_process(process, queue)
 
 > :warning: When adding processes, ensure that the queue instance passed to the function is the same as the queue added to the scheduler. Also take care that the function puts its output in the queue instead of returning it.
 
+#### Sub-tasks
+
+The functions above take an optional `subtasks` parameter. `subtasks` is used to hint to the scheduler that each process may create its own processes; this will be taken into account when scheduling processes.
+
+For example, if each process creates 4 processes you could use `scheduler.add(target=my_process, args=my_args, subtasks=4)`.
+
 ### Running a scheduler
 
 When a scheduler runs, it will run all tasks until complete and then return an ordered list containing the output from each task.
@@ -196,11 +202,13 @@ To cancel a scheduler, use `terminate()`:
 scheduler.terminate()
 ```
 
+A terminated scheduler will always return an empty list.
+
 ## Design
 
 When the scheduler starts, it will simultaneously run a number of processes up to the value returned by `Scheduler.optimal_process_count()`. When a process finishes, another is started to take its place.
 
-If `dynamic` is enabled, the scheduler will check the CPU usage periodically and increase the number of concurrent processes if it below the threshold.
+If `dynamic` is enabled, the scheduler will check the CPU usage periodically and increase the number of concurrent processes if the CPU usage is below the threshold.
 
 This diagram demonstrates the implementation of `Scheduler`:
 
