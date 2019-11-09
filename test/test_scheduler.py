@@ -27,14 +27,46 @@ import multiprocess
 
 from scheduler.Scheduler import Scheduler
 from scheduler.Task import Task
-from test.utils import (
-    _long_task,
-    _get_input_output,
-    assert_results,
-    _func,
-    _funcq,
-    _func_no_params,
-)
+
+try:
+    from test.utils import (
+        _long_task,
+        _get_input_output,
+        _get_input_output_numpy,
+        assert_results,
+        assert_results_numpy,
+        _func,
+        _funcq,
+        _func_no_params,
+        _func_numpy,
+    )
+except:
+    from utils import (
+        _long_task,
+        _get_input_output,
+        _get_input_output_numpy,
+        assert_results,
+        assert_results_numpy,
+        _func,
+        _funcq,
+        _func_no_params,
+        _func_numpy,
+    )
+
+
+def test_shared_memory_numpy():
+    """Tests whether `run_blocking()` works correctly."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output_numpy()
+    for a in args:
+        scheduler.add(target=_func_numpy, args=a)
+
+    loop = asyncio.get_event_loop()
+    results: List = loop.run_until_complete(scheduler.run())
+    assert_results_numpy(expected, results)
+
+    assert scheduler.finished
 
 
 def test_add_process():
@@ -211,5 +243,5 @@ def test_terminate():
 
 
 if __name__ == "__main__":
-    test_run_async()
-    test_terminate()
+    test_shared_memory_numpy()
+    print("Finished.")

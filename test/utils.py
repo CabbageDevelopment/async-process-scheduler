@@ -21,9 +21,12 @@
 #  SOFTWARE.
 
 import time
+from numpy import ndarray
 from multiprocessing import Process
 from multiprocessing.queues import Queue
 from typing import Tuple, List
+
+msg_length = "Length of expected results is not equal to length of results."
 
 
 def _long_task(_time: int = 1):
@@ -44,6 +47,12 @@ def _get_input_output() -> Tuple[List, List]:
     return args, expected_output
 
 
+def _get_input_output_numpy() -> Tuple[List, List]:
+    args = [(i, 5000000 + i ** 2) for i in range(15)]
+    expected_output = [(_func_numpy(*a)) for a in args]
+    return args, expected_output
+
+
 def assert_results(expected, results):
     assert len(expected) == len(results)
 
@@ -53,6 +62,19 @@ def assert_results(expected, results):
 
         if i < count - 1:
             assert expected[i] != results[i + 1]
+
+
+def assert_results_numpy(expected, results):
+    assert len(expected) == len(results), msg_length
+
+    for i in range(len(results)):
+        assert (expected[i] == results[i]).all()
+
+
+def _func_numpy(x, y) -> ndarray:
+    import numpy
+
+    return numpy.arange(x, y)
 
 
 def _func_no_params() -> float:
