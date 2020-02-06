@@ -1,5 +1,6 @@
 ### Custom ###
-
+.idea/async-process-scheduler.iml
+.idea/misc.xml
 .vscode/
 
 # Created by https://www.gitignore.io/api/pycharm,python
