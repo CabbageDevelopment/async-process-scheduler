@@ -79,7 +79,7 @@ class Scheduler:
             self.mgr = None
 
         self.tasks: List[Task] = []
-        self.output: List[tuple] = []
+        self.output: List[Tuple] = []
 
         # Minimum number of tasks to run concurrently.
         self.min_concurrent_count: int = self.optimal_process_count()
@@ -127,7 +127,7 @@ class Scheduler:
     def add(
         self,
         target: Callable,
-        args: tuple = (),
+        args: Tuple = (),
         subtasks: int = 0,
         process_type: Type = multiprocessing.Process,
         queue_type: Type = multiprocessing.Queue,
@@ -161,7 +161,7 @@ class Scheduler:
         subtasks: int = 0,
         process_type: Type = multiprocessing.Process,
         queue_type: Type = multiprocessing.Queue,
-    ) -> List[Tuple]:
+    ) -> Union[List[Tuple], List[Any]]:
         """
         Maps arguments over a single function. Each item in 'args' will be used 
         as the input for a single process.
@@ -194,7 +194,7 @@ class Scheduler:
         subtasks: int = 0,
         process_type: Type = multiprocessing.Process,
         queue_type: Type = multiprocessing.Queue,
-    ) -> List[Tuple]:
+    ) -> Union[List[Tuple], List[Any]]:
         """
         Equivalent to 'map()', but blocking. 
         
@@ -236,7 +236,7 @@ class Scheduler:
 
         self.tasks.extend(args)
 
-    async def run(self) -> List[tuple]:
+    async def run(self) -> Union[List[Tuple], List[Any]]:
         """
         Runs the tasks in a coroutine.
 
@@ -260,7 +260,7 @@ class Scheduler:
 
         return self.output
 
-    def run_blocking(self) -> List[tuple]:
+    def run_blocking(self) -> Union[List[Tuple], List[Any]]:
         """
         Runs the tasks. Will block the current thread until all tasks are complete.
 
