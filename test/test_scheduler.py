@@ -152,7 +152,7 @@ def test_run_blocking():
     assert scheduler.finished
 
 
-def test_run_async():
+def test_run():
     """Tests whether `run()` works correctly."""
     scheduler = Scheduler()
 
@@ -165,6 +165,36 @@ def test_run_async():
 
     assert_results(expected, results)
 
+    assert scheduler.finished
+
+
+def test_map():
+    """Tests whether `map()` works correctly."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output()
+
+    loop = asyncio.get_event_loop()
+    results: List[Tuple[int, int, int]] = loop.run_until_complete(
+        scheduler.map(target=_func, args=args)
+    )
+
+    assert_results(expected, results)
+    assert scheduler.finished
+
+
+def test_map_blocking():
+    """Tests whether `map_blocking()` works correctly."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output()
+
+    loop = asyncio.get_event_loop()
+    results: List[Tuple[int, int, int]] = scheduler.map_blocking(
+        target=_func, args=args
+    )
+
+    assert_results(expected, results)
     assert scheduler.finished
 
 

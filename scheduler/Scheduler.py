@@ -26,7 +26,7 @@ import multiprocessing
 import time
 import sys
 from multiprocessing import cpu_count, Process, Queue
-from typing import List, Callable, Type, Optional, Union, Any
+from typing import List, Callable, Type, Optional, Union, Any, Tuple, Iterable
 
 import psutil
 
@@ -153,6 +153,66 @@ class Scheduler:
 
         process = process_type(target=_wrapper, args=_args)
         self.tasks.append(Task(process, queue, subtasks=subtasks))
+
+    async def map(
+        self,
+        target: Callable,
+        args: Iterable = (),
+        subtasks: int = 0,
+        process_type: Type = multiprocessing.Process,
+        queue_type: Type = multiprocessing.Queue,
+    ) -> List[Tuple]:
+        """
+        Maps arguments over a single function. Each item in 'args' will be used 
+        as the input for a single process.
+
+        This is equivalent to adding one or more tasks to the scheduler 
+        with 'add()', then starting the scheduler.  
+
+        :param target: the function to run in another process
+        :param args: the arguments for the function as a tuple
+        :param subtasks: the number of subtasks
+        :param process_type: the type of process; you can specify another type such as `multiprocess.Process`
+        :param queue_type: the type of queue; you can specify another type such as `multiprocess.Queue`
+        :returns an ordered list containing the output of each task if complete, or an empty list if terminated
+        """
+        for _args in args:
+            self.add(
+                target=target,
+                args=_args,
+                subtasks=subtasks,
+                process_type=process_type,
+                queue_type=queue_type,
+            )
+
+        return await self.run()
+
+    def map_blocking(
+        self,
+        target: Callable,
+        args: Iterable = (),
+        subtasks: int = 0,
+        process_type: Type = multiprocessing.Process,
+        queue_type: Type = multiprocessing.Queue,
+    ) -> List[Tuple]:
+        """
+        Equivalent to 'map()', but blocking. 
+        
+        Maps arguments over a single function. Each item in 'args' will be used 
+        as the input for a single process.
+
+        :returns an ordered list containing the output of each task if complete, or an empty list if terminated
+        """
+        for _args in args:
+            self.add(
+                target=target,
+                args=_args,
+                subtasks=subtasks,
+                process_type=process_type,
+                queue_type=queue_type,
+            )
+
+        return self.run_blocking()
 
     def add_task(self, task: Task) -> None:
         """
