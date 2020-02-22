@@ -24,8 +24,9 @@ import asyncio
 import functools
 import multiprocessing
 import time
+import sys
 from multiprocessing import cpu_count, Process, Queue
-from typing import List, Callable, Type
+from typing import List, Callable, Type, Optional, Union, Any
 
 import psutil
 
@@ -38,7 +39,7 @@ class Scheduler:
     A class which handles scheduling tasks, according to the number of CPU cores.
 
     As an example, a 4-core, 8-thread machine will run 9 processes
-    concurrently and an 8-core, 16-thread CPU will run 17 processes
+    concurrently; an 8-core, 16-thread CPU will run 17 processes
     concurrently.
 
     If `dynamic` is enabled, Scheduler will also check CPU usage and increase
@@ -52,6 +53,7 @@ class Scheduler:
         dynamic: bool = True,
         cpu_threshold: float = 95,
         cpu_update_interval: float = 5,
+        shared_memory: bool = True,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -61,9 +63,20 @@ class Scheduler:
         :param cpu_threshold: the minimum target CPU usage, in percent; if `dynamic` is enabled and CPU usage is found
         to be below the threshold, the number of simultaneous tasks will be increased
         :param cpu_update_interval: the time, in seconds, between consecutive CPU usage checks when `dynamic` is enabled
+        :param shared_memory: whether to use shared memory if possible
         """
         self.dynamic = dynamic
         self.update_interval = update_interval
+
+        # Shared memory is only available on Python >= 3.8.
+        self.shared_memory = shared_memory and sys.version_info >= (3, 8,)
+
+        if self.shared_memory:
+            from multiprocessing.managers import SharedMemoryManager
+
+            self.mgr: SharedMemoryManager = SharedMemoryManager()
+        else:
+            self.mgr = None
 
         self.tasks: List[Task] = []
         self.output: List[tuple] = []
@@ -135,7 +148,7 @@ class Scheduler:
 
         queue = queue_type()
 
-        _args = (queue,) + args
+        _args = (queue, self.mgr) + args
         _wrapper = functools.partial(wrapper, target)
 
         process = process_type(target=_wrapper, args=_args)
@@ -182,7 +195,9 @@ class Scheduler:
         if self.terminated:
             return []
 
+        self._sanitise_output()
         self.finished = True
+
         return self.output
 
     def run_blocking(self) -> List[tuple]:
@@ -204,7 +219,11 @@ class Scheduler:
         if self.terminated:
             return []
 
+        self._sanitise_output()
         self.finished = True
+
+        self._shutdown()
+
         return self.output
 
     def terminate(self) -> None:
@@ -212,6 +231,15 @@ class Scheduler:
         if not self.terminated:
             [t.terminate() for t in self.tasks]
             self.terminated = True
+
+        self._shutdown()
+
+    def _shutdown(self) -> None:
+        """
+        Called to shut down any open resources, such as the shared memory manager.
+        """
+        if self.mgr:
+            self.mgr.shutdown()
 
     def is_running(self) -> bool:
         """:returns whether the scheduler is running."""
@@ -227,6 +255,28 @@ class Scheduler:
     def _initialize_output(self) -> None:
         # Initialize `self.output` so that it can be indexed into.
         self.output = [None for _ in self.tasks]
+
+    def _sanitise_output(self) -> None:
+        """
+        Converts the output into its expected form. This involves replacing 
+        SharedMemoryObject instances with their data.
+        """
+        for i in range(len(self.output)):
+            item = self.output[i]
+            if not isinstance(item, tuple):
+                if isinstance(item, SharedMemoryObject):
+                    self.output[i] = item.get()
+
+                continue
+
+            out = []
+            for obj in item:
+                if isinstance(obj, SharedMemoryObject):
+                    obj = obj.get()
+
+                out.append(obj)
+
+            self.output[i] = tuple(out)
 
     def _update(self) -> None:
         """
@@ -270,6 +320,10 @@ class Scheduler:
         Starts the scheduler running its tasks.
         """
         self.started = True
+
+        if self.mgr:
+            self.mgr.start()
+
         self.total_task_count = sum([t.total_tasks() for t in self.tasks])
 
         self.time_start = time.time()
@@ -338,9 +392,95 @@ class Scheduler:
         return available[:final_task_index]
 
 
-def wrapper(function: Callable, queue: Queue, *args):
+def wrapper(
+    function: Callable, queue: Queue, manager: Optional["SharedMemoryManager"], *args
+) -> None:
     """
     Wrapper which calls a function with its specified arguments and puts the output in a queue.
+
+    :param function: the function which will be executed
+    :param queue: a Queue object which may be used to transfer data between processes
+    :param manager: a SharedMemoryManager or None; used to handle shared memory between processes
     """
-    result: tuple = function(*args)
-    queue.put(result)
+    result = function(*args)
+    out = []
+
+    if not isinstance(result, tuple):
+        result = (result,)  # Convert to tuple.
+
+    if manager:
+        for item in result:
+            out.append(SharedMemoryObject.attach(manager, item))
+    else:
+        out = result
+
+    # If one result was returned from task, switch to single variable instead of tuple.
+    if len(out) == 1:
+        out = out[0]
+    else:
+        out = tuple(out)
+
+    queue.put(out)
+
+
+class DummyNdarray:
+    """
+    Does nothing. Used when numpy is not installed.
+    """
+
+
+class SharedMemoryObject:
+    """
+    Wrapper class around a shared memory segment.
+    """
+
+    def __init__(self, name: str, shape, dtype):
+        self.name = name
+        self.shape = shape
+        self.dtype = dtype
+
+    @staticmethod
+    def attach(manager, obj) -> Union["SharedMemoryObject", Any]:
+        if SharedMemoryObject.is_ndarray(obj) and obj.size > 2:
+            from numpy import ndarray
+
+            arr = obj
+
+            shared = manager.SharedMemory(size=arr.nbytes)
+            sm_arr = ndarray(arr.shape, dtype=arr.dtype, buffer=shared.buf)
+
+            sm_arr[:] = arr[:]
+            name = shared.name
+            shared.close()
+
+            return SharedMemoryObject(name, sm_arr.shape, sm_arr.dtype)
+
+        return obj
+
+    @staticmethod
+    def is_ndarray(obj):
+        try:
+            from numpy import ndarray
+        except:
+            # Not installed, use dummy type.
+            ndarray = DummyNdarray
+
+        return isinstance(obj, ndarray)
+
+    def get(self):
+        """
+        Gets the value from shared memory, and deletes the shared memory block.
+        """
+        from multiprocessing import shared_memory as sm
+        from numpy import ndarray
+
+        shared = sm.SharedMemory(name=self.name)
+        sm_arr = ndarray(self.shape, dtype=self.dtype, buffer=shared.buf)
+
+        arr = ndarray(sm_arr.shape, dtype=sm_arr.dtype)
+        arr[:] = sm_arr[:]
+
+        shared.close()
+        shared.unlink()
+
+        return arr
