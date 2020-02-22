@@ -31,7 +31,7 @@ with open(path.join(here, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="AsyncProcessScheduler",
-    version="0.4.0b1",
+    version="0.5.0b1",
     packages=["scheduler"],
     python_requires="~=3.6",
     install_requires=["psutil"],
