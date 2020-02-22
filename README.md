@@ -9,7 +9,7 @@
 
 ## Introduction
 
-Async Process Scheduler is a small Python library which provides a simple, GUI-friendly way to efficiently run many processes while avoiding a callback-based data flow. 
+Async Process Scheduler is a small Python library which provides a simple, GUI-friendly way to efficiently run many processes while avoiding a callback-based data flow.
 
 Async Process Scheduler is compatible with `multiprocessing` from the standard library, and equivalent implementations such as `multiprocess`.
 
@@ -19,7 +19,7 @@ Async Process Scheduler is compatible with `multiprocessing` from the standard l
 
 To install Async Process Scheduler, use `pip`:
 
-```
+```bash
 pip install AsyncProcessScheduler
 ```
 
@@ -38,17 +38,13 @@ def long_calculation(x: int, y: int) -> Tuple[int, int]:
 async def run() -> None:
     """Runs 16 processes with the scheduler and prints the results."""
     scheduler = Scheduler()
-    num_processes = 16
 
-    for i in range(num_processes):
-        # Add `long_calculation` to the scheduler with x=i, y=i+1.
-        scheduler.add(
-            target=long_calculation, 
-            args=(i, i+1)
-        ) 
+    # Create (x, y) inputs for 16 processes.
+    num_processes = 16
+    args = [(i, i+1) for i in range(num_processes)]
 
     # Run all processes and get an ordered list containing the results from each.
-    results: List[Tuple] = await scheduler.run()
+    results: List[Tuple] = await scheduler.map(target=long_calculation, args=args)
 
     # Do something with the results.
     print(results)
@@ -94,7 +90,47 @@ The progress callback is called on the thread which the coroutine runs in, and c
 
 > :warning: This functionality may change before v1.0.0.
 
+### Mapping using a scheduler
+
+The easiest way to run code using a Scheduler is to map an iterable of inputs over a function. 
+
+This allows you to supply a function, and a list of tuples containing the inputs to the function. The output will be calculated in a separate process for each set of inputs.
+
+#### Mapping in a coroutine
+
+```python
+"""
+Snippet which demonstrates mapping values over a function.
+"""
+
+def my_calculation(x: int, y: float, z: str) -> Tuple[int, float, str]:
+    """Simulates a long calculation and returns the function parameters."""
+    time.sleep(5)
+    return x, y, z
+
+scheduler = Scheduler()
+args = [
+    (1, 3.14, "test1"),  # Args for first process.
+    (0, 2.10, "test2"),  # Args for second process.
+    (5, 10.0, "test3"),  # Args for third process.
+]
+```
+
+The results can then be computed in a coroutine:
+
+```python
+results: List = await scheduler.map(target=my_calculation, args=args)
+```
+
+#### Mapping (blocking)
+
+```python
+results: List = scheduler.map_blocking(target=my_calculation, args=args)
+```
+
 ### Adding tasks to a scheduler
+
+Instead of using `map()`, tasks can individually be added to a scheduler. After adding all tasks, the scheduler can be started with `run()`.
 
 You can add normal functions to a scheduler. If you're migrating from process-oriented code, you may find it easier to add processes and queues to a scheduler instead.
 
