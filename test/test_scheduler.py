@@ -39,6 +39,7 @@ try:
         _funcq,
         _func_no_params,
         _func_numpy,
+        _func_no_return,
     )
 except:
     from utils import (
@@ -51,6 +52,7 @@ except:
         _funcq,
         _func_no_params,
         _func_numpy,
+        _func_no_return,
     )
 
 
@@ -180,6 +182,35 @@ def test_map():
     )
 
     assert_results(expected, results)
+    assert scheduler.finished
+
+
+def test_map_no_args():
+    """
+    Tests whether `map()` works correctly with no araguments.
+    """
+    scheduler = Scheduler()
+
+    loop = asyncio.get_event_loop()
+    results: List = loop.run_until_complete(scheduler.map(target=_func_no_params))
+
+    expected = _func_no_params()
+
+    assert all([r == expected for r in results])
+    assert scheduler.finished
+
+
+def test_map_no_return():
+    """
+    Tests whether 'map()' works correctly when the target function 
+    does not return any values.
+    """
+    scheduler = Scheduler()
+
+    loop = asyncio.get_event_loop()
+    results = loop.run_until_complete(scheduler.map(target=_func_no_return))
+
+    assert all([r is None for r in results])
     assert scheduler.finished
 
 

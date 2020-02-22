@@ -48,7 +48,7 @@ def _get_input_output() -> Tuple[List, List]:
 
 
 def _get_input_output_numpy() -> Tuple[List, List]:
-    args = [(i, 5000000 + i ** 2) for i in range(15)]
+    args = [(i, 500000 + i ** 2) for i in range(15)]
     expected_output = [(_func_numpy(*a)) for a in args]
     return args, expected_output
 
@@ -75,6 +75,10 @@ def _func_numpy(x, y) -> ndarray:
     import numpy
 
     return numpy.arange(x, y)
+
+
+def _func_no_return(x: int) -> None:
+    pass
 
 
 def _func_no_params() -> float:
