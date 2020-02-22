@@ -19,16 +19,16 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-
 import asyncio
 import functools
 import multiprocessing
 import time
 from multiprocessing import cpu_count, Process, Queue
-from typing import List, Callable, Type
+from typing import List, Callable, Type, Optional
 
 import psutil
 
+from scheduler import args
 from scheduler.Task import Task
 from scheduler.utils import SchedulerException
 
@@ -52,6 +52,7 @@ class Scheduler:
         dynamic: bool = True,
         cpu_threshold: float = 95,
         cpu_update_interval: float = 5,
+        metrics_file: Optional[str] = None,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -64,6 +65,21 @@ class Scheduler:
         """
         self.dynamic = dynamic
         self.update_interval = update_interval
+
+        self.metrics = args.metrics()
+        self.metrics_file = metrics_file
+
+        if self.metrics:
+            try:
+                import numpy
+            except ImportError:
+                print(
+                    "Numpy must be installed when Scheduler metrics are enabled. Disabling metrics."
+                )
+                self.metrics = False
+
+            if not self.metrics_file:
+                self.metrics_file = "metrics.npy"
 
         self.tasks: List[Task] = []
         self.output: List[tuple] = []
