@@ -258,6 +258,8 @@ class Scheduler:
         self._sanitise_output()
         self.finished = True
 
+        self._shutdown()
+
         return self.output
 
     def run_blocking(self) -> Union[List[Tuple], List[Any]]:
