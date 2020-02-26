@@ -33,7 +33,7 @@ import sys
 import time
 from typing import List, Tuple
 
-import asyncqt
+import qasync
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import (
     QApplication,
@@ -47,12 +47,12 @@ from PyQt5.QtWidgets import (
 from scheduler.Scheduler import Scheduler
 
 
-def long_calculation(sleep_time: int) -> Tuple[int]:
+def long_calculation(sleep_time: int) -> int:
     """
     Will be executed in another process. Simulates a long calculation, and returns the 'result'.
     """
     time.sleep(sleep_time)
-    return (sleep_time,)
+    return sleep_time
 
 
 class Window(QWidget):
@@ -97,17 +97,22 @@ class Window(QWidget):
         self.scheduler = Scheduler(progress_callback=self.on_progress)
 
         num_processes = 16
-        for i in range(num_processes):
-            # Generate random input for function.
-            sleep = random.randint(1, 8)
-            self.scheduler.add(target=long_calculation, args=(sleep,))
+        args = []
 
-        # Run all processes and `await` the results: an ordered list containing one tuple from each process.
-        output: List[Tuple] = await self.scheduler.run()
+        for _ in range(num_processes):
+            sleep_time = random.randint(1, 8)
 
-        # If the scheduler was terminated before completion, we don't want the results.
+            # Add to list of arguments. Must be tuple.
+            args.append((sleep_time,))
+
+        # Run all processes and `await` the results: an ordered list containing one int from each process.
+        output: List[int] = await self.scheduler.map(
+            target=long_calculation, args=args,
+        )
+
+        # (If the scheduler was terminated before completion, we don't want the results).
         if not self.scheduler.terminated:
-            text = ", ".join([str(i[0]) for i in output])
+            text = ", ".join([str(i) for i in output])
             self.label.setText(f"Output: {text}")
             self.button.setText("Start")
 
@@ -130,8 +135,8 @@ class Window(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # Important: set the event loop using `asyncqt`.
-    loop = asyncqt.QEventLoop(app)
+    # Important: set the event loop using `qasync`.
+    loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
 
     window = Window()
