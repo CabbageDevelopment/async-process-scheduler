@@ -54,6 +54,7 @@ class Scheduler:
         cpu_threshold: float = 95,
         cpu_update_interval: float = 5,
         shared_memory: bool = True,
+        shared_memory_threshold:int = 1e7,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -64,6 +65,7 @@ class Scheduler:
         to be below the threshold, the number of simultaneous tasks will be increased
         :param cpu_update_interval: the time, in seconds, between consecutive CPU usage checks when `dynamic` is enabled
         :param shared_memory: whether to use shared memory if possible
+        :param shared_memory_threshold: the minimum size of a Numpy array which will cause it to be transferred using shared memory if possible
         """
         self.dynamic = dynamic
         self.update_interval = update_interval
@@ -77,6 +79,8 @@ class Scheduler:
             self.mgr: SharedMemoryManager = SharedMemoryManager()
         else:
             self.mgr = None
+
+        self.shared_memory_threshold = shared_memory_threshold
 
         self.tasks: List[Task] = []
         self.output: List[Tuple] = []
@@ -148,7 +152,7 @@ class Scheduler:
 
         queue = queue_type()
 
-        _args = (queue, self.mgr) + args
+        _args = (queue, self.mgr, self.shared_memory_threshold) + args
         _wrapper = functools.partial(wrapper, target)
 
         process = process_type(target=_wrapper, args=_args)
@@ -455,7 +459,11 @@ class Scheduler:
 
 
 def wrapper(
-    function: Callable, queue: Queue, manager: Optional["SharedMemoryManager"], *args
+    function: Callable,
+    queue: Queue,
+    manager: Optional["SharedMemoryManager"],
+    threshold: int,
+    *args: Any
 ) -> None:
     """
     Wrapper which calls a function with its specified arguments and puts the output in a queue.
@@ -472,7 +480,7 @@ def wrapper(
 
     if manager:
         for item in result:
-            out.append(SharedMemoryObject.attach(manager, item))
+            out.append(SharedMemoryObject.attach(manager, item, threshold))
     else:
         out = result
 
@@ -502,8 +510,10 @@ class SharedMemoryObject:
         self.dtype = dtype
 
     @staticmethod
-    def attach(manager, obj) -> Union["SharedMemoryObject", Any]:
-        if SharedMemoryObject.is_ndarray(obj) and obj.size > 2:
+    def attach(
+        manager: "SharedMemoryManager", obj: Any, threshold: int
+    ) -> Union["SharedMemoryObject", Any]:
+        if SharedMemoryObject.is_ndarray(obj) and obj.size > threshold:
             from numpy import ndarray
 
             arr = obj
