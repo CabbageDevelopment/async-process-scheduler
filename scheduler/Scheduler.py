@@ -53,7 +53,7 @@ class Scheduler:
         dynamic: bool = True,
         cpu_threshold: float = 95,
         cpu_update_interval: float = 5,
-        shared_memory: bool = True,
+        shared_memory: bool = False,
         shared_memory_threshold:int = 1e7,
     ):
         """

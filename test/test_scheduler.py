@@ -58,7 +58,7 @@ except:
 
 def test_shared_memory_numpy():
     """Tests whether `run_blocking()` works correctly."""
-    scheduler = Scheduler()
+    scheduler = Scheduler(shared_memory=True, shared_memory_threshold=0)
 
     args, expected = _get_input_output_numpy()
     for a in args:
