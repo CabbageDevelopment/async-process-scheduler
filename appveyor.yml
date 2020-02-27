@@ -1,0 +1,24 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python36"
+      PYTHON_VERSION: "3.6.9"
+      PYTHON_ARCH: "64"
+
+    - PYTHON: "C:\\Python37"
+      PYTHON_VERSION: "3.7.4"
+      PYTHON_ARCH: "64"
+
+    - PYTHON: "C:\\Python38"
+      PYTHON_VERSION: "3.8.1"
+      PYTHON_ARCH: "64"
+
+install:
+  - "%PYTHON%/Scripts/pip.exe install -r requirements.txt"
+  - "%PYTHON%/Scripts/pip.exe install -r test/requirements.txt"
+  - "%PYTHON%/Scripts/pip.exe install pytest"
+  - "%PYTHON%/Scripts/pip.exe install -e ."
+
+build: off
+
+test_script:
+        - "%PYTHON%/python.exe -m pytest -v ."
