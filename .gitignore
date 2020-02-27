@@ -2,6 +2,7 @@
 .idea/async-process-scheduler.iml
 .idea/misc.xml
 .vscode/
+**.swp
 
 # Created by https://www.gitignore.io/api/pycharm,python
 # Edit at https://www.gitignore.io/?templates=pycharm,python
