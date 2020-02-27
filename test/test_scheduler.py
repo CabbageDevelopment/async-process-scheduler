@@ -57,7 +57,9 @@ except:
 
 
 def test_shared_memory_numpy():
-    """Tests whether `run_blocking()` works correctly."""
+    """
+    Tests whether shared memory works correctly.
+    """
     scheduler = Scheduler(shared_memory=True, shared_memory_threshold=0)
 
     args, expected = _get_input_output_numpy()
@@ -72,7 +74,7 @@ def test_shared_memory_numpy():
 
 
 def test_add_process():
-    """Tests whether tasks are added to the scheduler correctly with `add()`."""
+    """Tests whether tasks are added to the scheduler correctly with `add_process()`."""
     scheduler = Scheduler()
 
     args, expected = _get_input_output()
@@ -120,7 +122,7 @@ def test_run_no_params():
 
 
 def test_multiprocess():
-    """Tests whether `add()` works correctly with `multiprocess` instead of `multiprocessing`."""
+    """Tests whether `add()` and `run_blocking()` work correctly with `multiprocess` instead of `multiprocessing`."""
     scheduler = Scheduler()
 
     args, expected = _get_input_output()
@@ -187,7 +189,7 @@ def test_map():
 
 def test_map_no_args():
     """
-    Tests whether `map()` works correctly with no araguments.
+    Tests whether `map()` works correctly with no arguments.
     """
     scheduler = Scheduler()
 
