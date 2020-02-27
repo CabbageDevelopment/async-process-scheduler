@@ -33,6 +33,8 @@ try:
         _long_task,
         _get_input_output,
         _get_input_output_numpy,
+        _get_input_output_single_result,
+        _get_input_output_two_results,
         assert_results,
         assert_results_numpy,
         _func,
@@ -40,12 +42,16 @@ try:
         _func_no_params,
         _func_numpy,
         _func_no_return,
+        _func_returns_single_value,
+        _func_returns_two_values,
     )
 except:
     from utils import (
         _long_task,
         _get_input_output,
         _get_input_output_numpy,
+        _get_input_output_single_result,
+        _get_input_output_two_results,
         assert_results,
         assert_results_numpy,
         _func,
@@ -53,6 +59,8 @@ except:
         _func_no_params,
         _func_numpy,
         _func_no_return,
+        _func_returns_single_value,
+        _func_returns_two_values,
     )
 
 
@@ -187,6 +195,39 @@ def test_map():
     assert scheduler.finished
 
 
+def test_map_one_return_value():
+    """Tests whether `map()` works correctly when the target function only returns a single result."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output_single_result()
+
+    loop = asyncio.get_event_loop()
+    results: List[Tuple[int]] = loop.run_until_complete(
+        scheduler.map(target=_func_returns_single_value, args=args)
+    )
+
+    assert len(expected) == len(results)
+    assert all([not hasattr(r, "__len__") for r in results])
+
+    assert scheduler.finished
+
+
+def test_map_two_return_values():
+    """Tests whether `map()` works correctly when the target function returns two results."""
+    scheduler = Scheduler()
+
+    args, expected = _get_input_output_two_results()
+
+    loop = asyncio.get_event_loop()
+    results: List[Tuple[int, int]] = loop.run_until_complete(
+        scheduler.map(target=_func_returns_two_values, args=args)
+    )
+
+    assert all([hasattr(r, "__len__") for r in results])
+    assert_results(expected, results)
+    assert scheduler.finished
+
+
 def test_map_no_args():
     """
     Tests whether `map()` works correctly with no arguments.
@@ -307,4 +348,5 @@ def test_terminate():
 
 if __name__ == "__main__":
     test_shared_memory_numpy()
+    test_map_two_return_values()
     print("Finished.")

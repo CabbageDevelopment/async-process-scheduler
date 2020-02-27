@@ -47,6 +47,18 @@ def _get_input_output() -> Tuple[List, List]:
     return args, expected_output
 
 
+def _get_input_output_single_result() -> Tuple[List, List]:
+    args = [(i,) for i in range(20)]
+    expected_output = [(_func_returns_single_value(*a)) for a in args]
+    return args, expected_output
+
+
+def _get_input_output_two_results() -> Tuple[List, List]:
+    args = [(i,) for i in range(20)]
+    expected_output = [(_func_returns_two_values(*a)) for a in args]
+    return args, expected_output
+
+
 def _get_input_output_numpy() -> Tuple[List, List]:
     args = [(i, 500000 + i ** 2) for i in range(15)]
     expected_output = [(_func_numpy(*a)) for a in args]
@@ -75,6 +87,14 @@ def _func_numpy(x, y) -> ndarray:
     import numpy
 
     return numpy.arange(x, y)
+
+
+def _func_returns_single_value(x: int) -> int:
+    return 3 * x
+
+
+def _func_returns_two_values(x: int) -> Tuple[int, int]:
+    return 5 * x, x ** 2
 
 
 def _func_no_return(x: int) -> None:
