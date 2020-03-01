@@ -23,14 +23,21 @@
 import asyncio
 import functools
 import multiprocessing
-import time
 import sys
+import time
 from multiprocessing import cpu_count, Process, Queue
-from typing import List, Callable, Type, Optional, Union, Any, Tuple, Iterable
+
+try:
+    from multiprocessing.managers import SharedMemoryManager
+except ImportError:
+    SharedMemoryManager = None
+
+from typing import List, Callable, Type, Union, Any, Tuple, Iterable
 
 import psutil
 
 from scheduler.Task import Task
+from scheduler.shared_memory import SharedMemoryObject, attach
 from scheduler.utils import SchedulerException
 
 
@@ -455,10 +462,12 @@ class Scheduler:
 
 
 def wrapper(
-    function: Callable, queue: Queue, manager: Optional["SharedMemoryManager"], *args
+    function: Callable, queue: Queue, manager: SharedMemoryManager, *args: Any
 ) -> None:
     """
     Wrapper which calls a function with its specified arguments and puts the output in a queue.
+
+    This function is called by processes created with a Scheduler.
 
     :param function: the function which will be executed
     :param queue: a Queue object which may be used to transfer data between processes
@@ -472,7 +481,7 @@ def wrapper(
 
     if manager:
         for item in result:
-            out.append(SharedMemoryObject.attach(manager, item))
+            out.append(attach(manager, item))
     else:
         out = result
 
@@ -483,66 +492,3 @@ def wrapper(
         out = tuple(out)
 
     queue.put(out)
-
-
-class DummyNdarray:
-    """
-    Does nothing. Used when numpy is not installed.
-    """
-
-
-class SharedMemoryObject:
-    """
-    Wrapper class around a shared memory segment.
-    """
-
-    def __init__(self, name: str, shape, dtype):
-        self.name = name
-        self.shape = shape
-        self.dtype = dtype
-
-    @staticmethod
-    def attach(manager, obj) -> Union["SharedMemoryObject", Any]:
-        if SharedMemoryObject.is_ndarray(obj) and obj.size > 2:
-            from numpy import ndarray
-
-            arr = obj
-
-            shared = manager.SharedMemory(size=arr.nbytes)
-            sm_arr = ndarray(arr.shape, dtype=arr.dtype, buffer=shared.buf)
-
-            sm_arr[:] = arr[:]
-            name = shared.name
-            shared.close()
-
-            return SharedMemoryObject(name, sm_arr.shape, sm_arr.dtype)
-
-        return obj
-
-    @staticmethod
-    def is_ndarray(obj):
-        try:
-            from numpy import ndarray
-        except:
-            # Not installed, use dummy type.
-            ndarray = DummyNdarray
-
-        return isinstance(obj, ndarray)
-
-    def get(self):
-        """
-        Gets the value from shared memory, and deletes the shared memory block.
-        """
-        from multiprocessing import shared_memory as sm
-        from numpy import ndarray
-
-        shared = sm.SharedMemory(name=self.name)
-        sm_arr = ndarray(self.shape, dtype=self.dtype, buffer=shared.buf)
-
-        arr = ndarray(sm_arr.shape, dtype=sm_arr.dtype)
-        arr[:] = sm_arr[:]
-
-        shared.close()
-        shared.unlink()
-
-        return arr
