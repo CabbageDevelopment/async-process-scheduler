@@ -1,6 +1,6 @@
 #  MIT License
 #
-#  Copyright (c) 2019 Sam McCormack
+#  Copyright (c) 2020 Sam McCormack
 #
 #  Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to deal
@@ -19,56 +19,37 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
+
 import asyncio
 from multiprocessing import Process, Queue
 from typing import List, Tuple
 
 import multiprocess
 
-from scheduler.Scheduler import Scheduler
-from scheduler.Task import Task
-
-try:
-    from test.utils import (
-        _long_task,
-        _get_input_output,
-        _get_input_output_numpy,
-        _get_input_output_single_result,
-        _get_input_output_two_results,
-        assert_results,
-        assert_results_numpy,
-        _func,
-        _funcq,
-        _func_no_params,
-        _func_numpy,
-        _func_no_return,
-        _func_returns_single_value,
-        _func_returns_two_values,
-    )
-except:
-    from utils import (
-        _long_task,
-        _get_input_output,
-        _get_input_output_numpy,
-        _get_input_output_single_result,
-        _get_input_output_two_results,
-        assert_results,
-        assert_results_numpy,
-        _func,
-        _funcq,
-        _func_no_params,
-        _func_numpy,
-        _func_no_return,
-        _func_returns_single_value,
-        _func_returns_two_values,
-    )
+from scheduler.ProcessTask import ProcessTask
+from test.utils import (
+    _get_input_output_numpy,
+    _func_numpy,
+    assert_results_numpy,
+    _get_input_output,
+    _funcq,
+    assert_results,
+    _func,
+    _func_no_params,
+    _get_input_output_single_result,
+    _func_returns_single_value,
+    _get_input_output_two_results,
+    _func_returns_two_values,
+    _func_no_return,
+    _long_task,
+)
 
 
-def test_shared_memory_numpy():
+def test_shared_memory_numpy(scheduler):
     """
     Tests whether shared memory works correctly.
     """
-    scheduler = Scheduler(shared_memory=True, shared_memory_threshold=0)
+    # scheduler = Scheduler(shared_memory=True, shared_memory_threshold=0)
 
     args, expected = _get_input_output_numpy()
     for a in args:
@@ -81,9 +62,9 @@ def test_shared_memory_numpy():
     assert scheduler.finished
 
 
-def test_add_process():
+def test_add_process(scheduler):
     """Tests whether tasks are added to the scheduler correctly with `add_process()`."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
     for a in args:
@@ -98,9 +79,9 @@ def test_add_process():
     assert scheduler.finished
 
 
-def test_add():
+def test_add(scheduler):
     """Tests whether `add()` works correctly."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
     for a in args:
@@ -112,9 +93,9 @@ def test_add():
     assert scheduler.finished
 
 
-def test_run_no_params():
+def test_run_no_params(scheduler):
     """Tests whether `run()` works correctly on a function with no parameters."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     expected = _func_no_params()
     for a in range(50):
@@ -129,9 +110,9 @@ def test_run_no_params():
     assert scheduler.finished
 
 
-def test_multiprocess():
+def test_multiprocess(scheduler):
     """Tests whether `add()` and `run_blocking()` work correctly with `multiprocess` instead of `multiprocessing`."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
     for a in args:
@@ -148,9 +129,9 @@ def test_multiprocess():
     assert scheduler.finished
 
 
-def test_run_blocking():
+def test_run_blocking(scheduler):
     """Tests whether `run_blocking()` works correctly."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
     for a in args:
@@ -164,9 +145,9 @@ def test_run_blocking():
     assert scheduler.finished
 
 
-def test_run():
+def test_run(scheduler):
     """Tests whether `run()` works correctly."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
     for a in args:
@@ -180,9 +161,9 @@ def test_run():
     assert scheduler.finished
 
 
-def test_map():
+def test_map(scheduler):
     """Tests whether `map()` works correctly."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
 
@@ -195,9 +176,9 @@ def test_map():
     assert scheduler.finished
 
 
-def test_map_one_return_value():
+def test_map_one_return_value(scheduler):
     """Tests whether `map()` works correctly when the target function only returns a single result."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output_single_result()
 
@@ -212,9 +193,9 @@ def test_map_one_return_value():
     assert scheduler.finished
 
 
-def test_map_two_return_values():
+def test_map_two_return_values(scheduler):
     """Tests whether `map()` works correctly when the target function returns two results."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output_two_results()
 
@@ -228,11 +209,11 @@ def test_map_two_return_values():
     assert scheduler.finished
 
 
-def test_map_no_args():
+def test_map_no_args(scheduler):
     """
     Tests whether `map()` works correctly with no arguments.
     """
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     loop = asyncio.get_event_loop()
     results: List = loop.run_until_complete(scheduler.map(target=_func_no_params))
@@ -243,12 +224,12 @@ def test_map_no_args():
     assert scheduler.finished
 
 
-def test_map_no_return():
+def test_map_no_return(scheduler):
     """
-    Tests whether 'map()' works correctly when the target function 
+    Tests whether 'map()' works correctly when the target function
     does not return any values.
     """
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     loop = asyncio.get_event_loop()
     results = loop.run_until_complete(scheduler.map(target=_func_no_return))
@@ -257,13 +238,12 @@ def test_map_no_return():
     assert scheduler.finished
 
 
-def test_map_blocking():
+def test_map_blocking(scheduler):
     """Tests whether `map_blocking()` works correctly."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
 
-    loop = asyncio.get_event_loop()
     results: List[Tuple[int, int, int]] = scheduler.map_blocking(
         target=_func, args=args
     )
@@ -272,16 +252,16 @@ def test_map_blocking():
     assert scheduler.finished
 
 
-def test_add_task():
+def test_add_task(scheduler):
     """Tests whether tasks are added to the scheduler correctly with `add_task()`."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
 
     args, expected = _get_input_output()
     for a in args:
         q = Queue()
         p = Process(target=_funcq, args=(q,) + a)
 
-        task = Task(p, q)
+        task = ProcessTask(p, q)
         scheduler.add_task(task)
 
     results: List[Tuple[int, int, int]] = scheduler.run_blocking()
@@ -290,9 +270,9 @@ def test_add_task():
     assert scheduler.finished
 
 
-def test_add_tasks():
+def test_add_tasks(scheduler):
     """Tests whether tasks are added to the scheduler correctly with `add_tasks()`."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
     tasks = []
 
     args, expected = _get_input_output()
@@ -300,7 +280,7 @@ def test_add_tasks():
         q = Queue()
         p = Process(target=_funcq, args=(q,) + a)
 
-        task = Task(p, q)
+        task = ProcessTask(p, q)
         tasks.append(task)
 
     scheduler.add_tasks(*tasks)
@@ -311,9 +291,9 @@ def test_add_tasks():
     assert scheduler.finished
 
 
-def test_terminate():
+def test_terminate(scheduler):
     """Tests whether the scheduler returns the correct result - an empty list - when terminated."""
-    scheduler = Scheduler()
+    # scheduler = Scheduler()
     count = 10
 
     async def run_scheduler():
@@ -344,9 +324,3 @@ def test_terminate():
 
     assert success
     assert not scheduler.finished
-
-
-if __name__ == "__main__":
-    test_shared_memory_numpy()
-    test_map_two_return_values()
-    print("Finished.")
