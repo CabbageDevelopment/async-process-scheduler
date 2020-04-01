@@ -23,14 +23,18 @@
 import asyncio
 import functools
 import multiprocessing
-import time
 import sys
+import threading
+import time
 from multiprocessing import cpu_count, Process, Queue
+from queue import Queue as MTQueue
 from typing import List, Callable, Type, Optional, Union, Any, Tuple, Iterable
 
 import psutil
 
+from scheduler.ProcessTask import ProcessTask
 from scheduler.Task import Task
+from scheduler.ThreadTask import ThreadTask
 from scheduler.utils import SchedulerException
 
 
@@ -54,7 +58,8 @@ class Scheduler:
         cpu_threshold: float = 95,
         cpu_update_interval: float = 5,
         shared_memory: bool = False,
-        shared_memory_threshold:int = 1e7,
+        shared_memory_threshold: int = 1e7,
+        run_in_thread: bool = False,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -66,7 +71,15 @@ class Scheduler:
         :param cpu_update_interval: the time, in seconds, between consecutive CPU usage checks when `dynamic` is enabled
         :param shared_memory: whether to use shared memory if possible
         :param shared_memory_threshold: the minimum size of a Numpy array which will cause it to be transferred using shared memory if possible
+        :param run_in_thread: if True, a single task will be run in a thread instead of a process.
+        This reduces the overhead (caused by spawning processes instead of forking) on Windows/macOS systems
         """
+        self.run_in_thread = run_in_thread
+        if self.run_in_thread and shared_memory:
+            raise SchedulerException(
+                f"Shared memory cannot currently be used when 'run_in_thread' is True."
+            )
+
         self.dynamic = dynamic
         self.update_interval = update_interval
 
@@ -125,7 +138,7 @@ class Scheduler:
                 "add() cannot be called on a Scheduler which has already been started."
             )
 
-        task = Task(process, queue, subtasks)
+        task = ProcessTask(process, queue, subtasks)
         self.tasks.append(task)
 
     def add(
@@ -150,13 +163,27 @@ class Scheduler:
                 "add_function() cannot be called on a scheduler which has already been started."
             )
 
-        queue = queue_type()
+        thread = self.run_in_thread and len(self.tasks) == 0
 
-        _args = (queue, self.mgr, self.shared_memory_threshold) + args
-        _wrapper = functools.partial(wrapper, target)
+        if thread:
+            queue = MTQueue()
 
-        process = process_type(target=_wrapper, args=_args)
-        self.tasks.append(Task(process, queue, subtasks=subtasks))
+            _args = (queue, self.mgr, self.shared_memory_threshold) + args
+            _wrapper = functools.partial(wrapper, target)
+
+            task = ThreadTask(
+                threading.Thread(target=_wrapper, args=_args), queue, subtasks=subtasks
+            )
+        else:
+            queue = queue_type()
+
+            _args = (queue, self.mgr, self.shared_memory_threshold) + args
+            _wrapper = functools.partial(wrapper, target)
+
+            process = process_type(target=_wrapper, args=_args)
+            task = ProcessTask(process, queue, subtasks=subtasks)
+
+        self.tasks.append(task)
 
     async def map(
         self,
@@ -463,7 +490,7 @@ def wrapper(
     queue: Queue,
     manager: Optional["SharedMemoryManager"],
     threshold: int,
-    *args: Any
+    *args: Any,
 ) -> None:
     """
     Wrapper which calls a function with its specified arguments and puts the output in a queue.
