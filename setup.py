@@ -19,19 +19,23 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-
+import re
 from os import path
 
 from setuptools import setup
 
 here = path.abspath(path.dirname(__file__))
 
+with open("scheduler/__init__.py") as f:
+    regexp = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+b[0-9]+")
+    version = regexp.findall(f.read())[0]
+
 with open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
     name="AsyncProcessScheduler",
-    version="0.6.0b1",
+    version=version,
     packages=["scheduler"],
     python_requires="~=3.6",
     install_requires=["psutil"],
