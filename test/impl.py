@@ -27,7 +27,7 @@ from typing import List, Tuple
 import multiprocess
 
 from scheduler.ProcessTask import ProcessTask
-from scheduler.utils import SchedulerException
+from scheduler.utils import SchedulerException, TaskFailedException
 from test.utils import (
     _get_input_output_numpy,
     _func_numpy,
@@ -339,6 +339,6 @@ def test_raise_exception(scheduler):
         loop.run_until_complete(scheduler.map(target=_func_raise_exception, args=args))
         assert False, "Scheduler did not raise Exception."
     except Exception as e:
-        assert isinstance(e, SchedulerException)
+        assert isinstance(e, TaskFailedException)
 
     assert scheduler.failed
