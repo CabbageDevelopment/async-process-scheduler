@@ -19,30 +19,15 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-from multiprocessing import Process, Queue
-
-from scheduler.Task import Task
-from scheduler.utils import terminate_tree
 
 
-class ProcessTask(Task):
-    def __init__(
-        self, process: Process, queue: Queue, exc_queue=None, subtasks: int = 0
-    ):
-        super(ProcessTask, self).__init__(queue, exc_queue, subtasks)
+from scheduler.Scheduler import Scheduler
+from test import impl
 
-        self.process = process
 
-    def start(self) -> None:
-        if not self.running and not self.finished:
-            self.process.start()
-            self.running = True
+def scheduler():
+    return Scheduler(raise_exceptions=True)
 
-    def terminate(self) -> None:
-        try:
-            terminate_tree(self.process)
-            self.queue.close()
-        except:
-            pass
-        finally:
-            self.running = False
+
+def test_raise_exception():
+    impl.test_raise_exception(scheduler())

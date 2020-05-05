@@ -42,3 +42,19 @@ class SchedulerException(Exception):
     """
     Exception raised when an error occurs with using Scheduler.
     """
+
+
+class TaskFailedException(Exception):
+    """
+    Exception raised when a task fails.
+    """
+
+    def __init__(self, msg: str):
+        asterisks = "*" * 20
+        formatted = (
+            f"\n\n{asterisks} TASK FAILED - TRACEBACK STARTS {asterisks}\n\n"
+            f"{msg}\n\n"
+            f"{asterisks} END OF TRACEBACK {asterisks}\n\n"
+        )
+
+        super(TaskFailedException, self).__init__(formatted)

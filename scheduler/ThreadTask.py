@@ -27,8 +27,8 @@ from scheduler.Task import Task
 
 
 class ThreadTask(Task):
-    def __init__(self, thread: Thread, queue: Queue, subtasks: int = 0):
-        super(ThreadTask, self).__init__(queue, subtasks)
+    def __init__(self, thread: Thread, queue: Queue, exc_queue=None, subtasks: int = 0):
+        super(ThreadTask, self).__init__(queue, exc_queue, subtasks)
 
         self.thread = thread
 

@@ -26,6 +26,7 @@ import multiprocessing
 import sys
 import threading
 import time
+import traceback
 from multiprocessing import cpu_count, Process, Queue
 from queue import Queue as MTQueue
 from typing import List, Callable, Type, Optional, Union, Any, Tuple, Iterable
@@ -35,7 +36,7 @@ import psutil
 from scheduler.ProcessTask import ProcessTask
 from scheduler.Task import Task
 from scheduler.ThreadTask import ThreadTask
-from scheduler.utils import SchedulerException
+from scheduler.utils import SchedulerException, TaskFailedException
 
 
 class Scheduler:
@@ -60,6 +61,7 @@ class Scheduler:
         shared_memory: bool = False,
         shared_memory_threshold: int = 1e7,
         run_in_thread: bool = False,
+        raise_exceptions: bool = False,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -72,8 +74,12 @@ class Scheduler:
         :param shared_memory: whether to use shared memory if possible
         :param shared_memory_threshold: the minimum size of a Numpy array which will cause it to be transferred using shared memory if possible
         :param run_in_thread: if True, a single task will be run in a thread instead of a process.
+        :param raise_exceptions: if True, Exceptions raised in processes will also be raised in
+        the process which the Scheduler was started in.
         This reduces the overhead (caused by spawning processes instead of forking) on Windows/macOS systems
         """
+        self.raise_exceptions = raise_exceptions
+
         self.run_in_thread = run_in_thread
         if self.run_in_thread and shared_memory:
             raise SchedulerException(
@@ -110,6 +116,7 @@ class Scheduler:
         self.time_start: float = 0
         self.started = False
         self.finished = False
+        self.failed = False
         self.terminated = False
 
         # Most recent time at which CPU utilisation was checked.
@@ -129,7 +136,9 @@ class Scheduler:
         # the total number of tasks.
         self.progress_callback: Callable[[int, int], None] = progress_callback
 
-    def add_process(self, process: Process, queue: Queue, subtasks: int = 0) -> None:
+    def add_process(
+        self, process: Process, queue: Queue, exc_queue: Queue = None, subtasks: int = 0
+    ) -> None:
         """
         Creates a task from a process and queue, and adds it to the scheduler.
         """
@@ -138,7 +147,7 @@ class Scheduler:
                 "add() cannot be called on a Scheduler which has already been started."
             )
 
-        task = ProcessTask(process, queue, subtasks)
+        task = ProcessTask(process, queue, exc_queue, subtasks)
         self.tasks.append(task)
 
     def add(
@@ -167,21 +176,26 @@ class Scheduler:
 
         if thread:
             queue = MTQueue()
+            exc_queue = MTQueue()
 
-            _args = (queue, self.mgr, self.shared_memory_threshold) + args
+            _args = (queue, self.mgr, self.shared_memory_threshold, exc_queue) + args
             _wrapper = functools.partial(wrapper, target)
 
             task = ThreadTask(
-                threading.Thread(target=_wrapper, args=_args), queue, subtasks=subtasks
+                threading.Thread(target=_wrapper, args=_args),
+                queue,
+                exc_queue=exc_queue,
+                subtasks=subtasks,
             )
         else:
             queue = queue_type()
+            exc_queue = queue_type()
 
-            _args = (queue, self.mgr, self.shared_memory_threshold) + args
+            _args = (queue, self.mgr, self.shared_memory_threshold, exc_queue) + args
             _wrapper = functools.partial(wrapper, target)
 
             process = process_type(target=_wrapper, args=_args)
-            task = ProcessTask(process, queue, subtasks=subtasks)
+            task = ProcessTask(process, queue, exc_queue=exc_queue, subtasks=subtasks)
 
         self.tasks.append(task)
 
@@ -398,7 +412,16 @@ class Scheduler:
 
         for t in self.running_tasks:
             t.update()
-            if t.finished:
+            if self.raise_exceptions and t.failed:
+                self.failed = True
+                if t.exception_tb:
+                    raise TaskFailedException(t.exception_tb)
+                else:
+                    raise SchedulerException(
+                        f"Task failed, but no exception was raised: {t}"
+                    )
+
+            elif t.finished:
                 index = self.tasks.index(t)
                 self.output[index] = t.queue.get()
 
@@ -490,6 +513,7 @@ def wrapper(
     queue: Queue,
     manager: Optional["SharedMemoryManager"],
     threshold: int,
+    exc_queue: Queue = None,
     *args: Any,
 ) -> None:
     """
@@ -499,25 +523,37 @@ def wrapper(
     :param queue: a Queue object which may be used to transfer data between processes
     :param manager: a SharedMemoryManager or None; used to handle shared memory between processes
     """
-    result = function(*args)
-    out = []
+    try:
+        result = function(*args)
+        out = []
 
-    if not isinstance(result, tuple):
-        result = (result,)  # Convert to tuple.
+        if not isinstance(result, tuple):
+            result = (result,)  # Convert to tuple.
 
-    if manager:
-        for item in result:
-            out.append(SharedMemoryObject.attach(manager, item, threshold))
-    else:
-        out = result
+        if manager:
+            for item in result:
+                out.append(SharedMemoryObject.attach(manager, item, threshold))
+        else:
+            out = result
 
-    # If one result was returned from task, switch to single variable instead of tuple.
-    if len(out) == 1:
-        out = out[0]
-    else:
-        out = tuple(out)
+        # If one result was returned from task, switch to single variable instead of tuple.
+        if len(out) == 1:
+            out = out[0]
+        else:
+            out = tuple(out)
 
-    queue.put(out)
+        queue.put(out)
+
+    except Exception as e:
+        if exc_queue:
+            tb = (
+                f"{type(e)}\n"
+                + "".join(traceback.format_tb(e.__traceback__))
+                + f"\n{e}"
+            )
+            exc_queue.put(tb)
+
+        raise e
 
 
 class DummyNdarray:

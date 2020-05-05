@@ -21,10 +21,11 @@
 #  SOFTWARE.
 
 import time
-from numpy import ndarray
 from multiprocessing import Process
 from multiprocessing.queues import Queue
 from typing import Tuple, List
+
+from numpy import ndarray
 
 msg_length = "Length of expected results is not equal to length of results."
 
@@ -111,3 +112,13 @@ def _func(x, y, z) -> Tuple:
 
 def _funcq(queue, x, y, z) -> None:
     queue.put((x ** 2, y ** 3, z ** 4))
+
+
+def _func_raise_exception(x, y, z) -> None:
+    raise TestException("Test exception.")
+
+
+class TestException(Exception):
+    """
+    Exception raised for testing.
+    """

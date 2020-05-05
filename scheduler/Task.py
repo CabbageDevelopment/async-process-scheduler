@@ -28,20 +28,35 @@ class Task(ABC):
     passed to the process, so that the process can put its output in the queue.
     """
 
-    def __init__(self, queue, subtasks: int):
+    def __init__(self, queue, exc_queue=None, subtasks: int = 0):
+        """
+
+        :param queue: Queue for data to be passed.
+        :param exc_queue: Queue for exceptions to be passed.
+        :param subtasks: Number of subtasks.
+        """
         self.queue = queue
+        self.exc_queue = exc_queue
+
         self.running = False
         self.finished = False
+
+        self.failed = False
+        self.exception_tb = None
 
         # The number of processes which will be spawned as part of this task.
         self.subtasks: int = subtasks
 
     @abstractmethod
     def start(self) -> None:
+        """Starts the task."""
         pass
 
     @abstractmethod
     def terminate(self) -> None:
+        """
+        Terminates the task and all running sub-tasks.
+        """
         pass
 
     def total_tasks(self) -> int:
@@ -56,6 +71,11 @@ class Task(ABC):
         Checks whether the task has finished, and sets properties
         according to the result.
         """
+        if self.has_exception():
+            self.exception_tb = self.exc_queue.get()
+            self.running = False
+            self.failed = True
+
         if self.running and self.has_result():
             self.finished = True
             self.running = False
@@ -63,3 +83,9 @@ class Task(ABC):
     def has_result(self) -> bool:
         """Returns whether the task has finished."""
         return not self.queue.empty()
+
+    def has_exception(self) -> bool:
+        """
+        Returns whether the task has raised an exception.
+        """
+        return self.exc_queue and not self.exc_queue.empty()

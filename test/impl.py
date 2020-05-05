@@ -27,6 +27,7 @@ from typing import List, Tuple
 import multiprocess
 
 from scheduler.ProcessTask import ProcessTask
+from scheduler.utils import SchedulerException
 from test.utils import (
     _get_input_output_numpy,
     _func_numpy,
@@ -42,6 +43,7 @@ from test.utils import (
     _func_returns_two_values,
     _func_no_return,
     _long_task,
+    _func_raise_exception,
 )
 
 
@@ -324,3 +326,19 @@ def test_terminate(scheduler):
 
     assert success
     assert not scheduler.finished
+
+
+def test_raise_exception(scheduler):
+    """
+    Tests whether the Scheduler responds correctly to a task raising an exception.
+    """
+    args, expected = _get_input_output()
+
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(scheduler.map(target=_func_raise_exception, args=args))
+        assert False, "Scheduler did not raise Exception."
+    except Exception as e:
+        assert isinstance(e, SchedulerException)
+
+    assert scheduler.failed
