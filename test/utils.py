@@ -118,6 +118,12 @@ def _func_raise_exception(x, y, z) -> None:
     raise TestException("Test exception.")
 
 
+def _func_print(text: str) -> None:
+    for i in range(1000):
+        print(i)
+        time.sleep(0.001)
+
+
 class TestException(Exception):
     """
     Exception raised for testing.

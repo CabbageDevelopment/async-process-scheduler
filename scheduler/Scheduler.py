@@ -36,7 +36,7 @@ import psutil
 from scheduler.ProcessTask import ProcessTask
 from scheduler.Task import Task
 from scheduler.ThreadTask import ThreadTask
-from scheduler.utils import SchedulerException, TaskFailedException
+from scheduler.utils import SchedulerException, TaskFailedException, StdOut
 
 
 class Scheduler:
@@ -62,6 +62,7 @@ class Scheduler:
         shared_memory_threshold: int = 1e7,
         run_in_thread: bool = False,
         raise_exceptions: bool = False,
+        capture_stdout: bool = False,
     ):
         """
         :param progress_callback: a function taking the number of finished tasks and the total number of tasks, which is
@@ -72,13 +73,17 @@ class Scheduler:
         to be below the threshold, the number of simultaneous tasks will be increased
         :param cpu_update_interval: the time, in seconds, between consecutive CPU usage checks when `dynamic` is enabled
         :param shared_memory: whether to use shared memory if possible
-        :param shared_memory_threshold: the minimum size of a Numpy array which will cause it to be transferred using shared memory if possible
-        :param run_in_thread: if True, a single task will be run in a thread instead of a process.
+        :param shared_memory_threshold: the minimum size of a Numpy array which will cause it to be transferred
+        using shared memory if possible
+        :param run_in_thread: if True, a single task will be run in a thread instead of a process. This reduces
+        the overhead (caused by spawning processes instead of forking) on Windows/macOS systems
         :param raise_exceptions: if True, Exceptions raised in processes will also be raised in
         the process which the Scheduler was started in.
-        This reduces the overhead (caused by spawning processes instead of forking) on Windows/macOS systems
+        :param capture_stdout: if True, `stdout` from processes will be captured and written to the main process'
+        `stdout`.
         """
         self.raise_exceptions = raise_exceptions
+        self.capture_stdout = capture_stdout
 
         self.run_in_thread = run_in_thread
         if self.run_in_thread and shared_memory:
@@ -178,7 +183,13 @@ class Scheduler:
             queue = MTQueue()
             exc_queue = MTQueue()
 
-            _args = (queue, self.mgr, self.shared_memory_threshold, exc_queue) + args
+            _args = (
+                queue,
+                self.mgr,
+                self.shared_memory_threshold,
+                exc_queue,
+                None,
+            ) + args
             _wrapper = functools.partial(wrapper, target)
 
             task = ThreadTask(
@@ -190,12 +201,25 @@ class Scheduler:
         else:
             queue = queue_type()
             exc_queue = queue_type()
+            stdout_queue = queue_type()
 
-            _args = (queue, self.mgr, self.shared_memory_threshold, exc_queue) + args
+            _args = (
+                queue,
+                self.mgr,
+                self.shared_memory_threshold,
+                exc_queue,
+                stdout_queue,
+            ) + args
             _wrapper = functools.partial(wrapper, target)
 
             process = process_type(target=_wrapper, args=_args)
-            task = ProcessTask(process, queue, exc_queue=exc_queue, subtasks=subtasks)
+            task = ProcessTask(
+                process,
+                queue,
+                exc_queue=exc_queue,
+                stdout_queue=stdout_queue,
+                subtasks=subtasks,
+            )
 
         self.tasks.append(task)
 
@@ -337,6 +361,7 @@ class Scheduler:
         """Terminates all running tasks by killing their processes."""
         if not self.terminated:
             [t.terminate() for t in self.tasks]
+            [self.stdout(t) for t in self.tasks]
             self.terminated = True
 
         self._shutdown()
@@ -412,8 +437,11 @@ class Scheduler:
 
         for t in self.running_tasks:
             t.update()
+            self.stdout(t)
+
             if self.raise_exceptions and t.failed:
                 self.failed = True
+
                 if t.exception_tb:
                     raise TaskFailedException(t.exception_tb)
                 else:
@@ -430,6 +458,13 @@ class Scheduler:
 
         if schedule_new_tasks:
             self._schedule_tasks()
+
+    def stdout(self, task: Task) -> None:
+        if self.capture_stdout:
+            text = task.get_stdout()
+
+            if text:
+                sys.stdout.write(text)
 
     def _start(self) -> None:
         """
@@ -514,16 +549,29 @@ def wrapper(
     manager: Optional["SharedMemoryManager"],
     threshold: int,
     exc_queue: Queue = None,
+    stdout_queue: Queue = None,
     *args: Any,
 ) -> None:
     """
     Wrapper which calls a function with its specified arguments and puts the output in a queue.
 
+    This function will be the Callable executed in a process/thread.
+
     :param function: the function which will be executed
     :param queue: a Queue object which may be used to transfer data between processes
     :param manager: a SharedMemoryManager or None; used to handle shared memory between processes
+    :param threshold:
+    :param exc_queue:
+    :param stdout_queue:
     """
+    stdout = None
+
     try:
+        if stdout_queue:
+            stdout = StdOut(stdout_queue)
+            sys.stdout = stdout
+            sys.stderr = stdout
+
         result = function(*args)
         out = []
 
@@ -541,6 +589,9 @@ def wrapper(
             out = out[0]
         else:
             out = tuple(out)
+
+        if stdout:
+            stdout.update(force=True)
 
         queue.put(out)
 

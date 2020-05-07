@@ -21,13 +21,15 @@
 #  SOFTWARE.
 
 import asyncio
+import sys
+import time
 from multiprocessing import Process, Queue
 from typing import List, Tuple
 
 import multiprocess
 
 from scheduler.ProcessTask import ProcessTask
-from scheduler.utils import SchedulerException, TaskFailedException
+from scheduler.utils import TaskFailedException
 from test.utils import (
     _get_input_output_numpy,
     _func_numpy,
@@ -44,6 +46,7 @@ from test.utils import (
     _func_no_return,
     _long_task,
     _func_raise_exception,
+    _func_print,
 )
 
 
@@ -342,3 +345,27 @@ def test_raise_exception(scheduler):
         assert isinstance(e, TaskFailedException)
 
     assert scheduler.failed
+
+
+text = ""
+
+
+def test_stdout(scheduler):
+    global text
+
+    expected = "\n".join([f"{i}" for i in range(1000)]) + "\n"
+
+    def temp(_stdout):
+        global text
+        text += _stdout
+
+    write = sys.stdout.write
+    sys.stdout.write = temp
+
+    scheduler.map_blocking(target=_func_print, args=[(expected,),])
+
+    while not text:
+        time.sleep(0.01)
+
+    sys.stdout.write = write
+    assert text == expected, "Text from stdout is incorrect."

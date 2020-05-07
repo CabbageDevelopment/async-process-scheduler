@@ -27,9 +27,14 @@ from scheduler.utils import terminate_tree
 
 class ProcessTask(Task):
     def __init__(
-        self, process: Process, queue: Queue, exc_queue=None, subtasks: int = 0
+        self,
+        process: Process,
+        queue: Queue,
+        exc_queue=None,
+        stdout_queue=None,
+        subtasks: int = 0,
     ):
-        super(ProcessTask, self).__init__(queue, exc_queue, subtasks)
+        super(ProcessTask, self).__init__(queue, exc_queue, stdout_queue, subtasks)
 
         self.process = process
 

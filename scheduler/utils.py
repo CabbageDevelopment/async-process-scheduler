@@ -19,9 +19,38 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
+import sys
+import time
 from multiprocessing import Process
 
 import psutil
+
+
+class StdOut:
+    def __init__(self, queue):
+        self.period = 1
+
+        self.last_update = time.time()
+        self.text = []
+
+        self.queue = queue
+
+    def write(self, text: str) -> None:
+        self.text.append(text)
+        self.update()
+
+    def update(self, force: bool = False) -> None:
+        if self.text and (force or time.time() - self.last_update > self.period):
+            out = "".join(self.text)
+
+            if out.strip():
+                self.queue.put(out)
+
+                self.last_update = time.time()
+                self.text = []
+
+    def flush(self) -> None:
+        return
 
 
 def terminate_tree(process: Process):

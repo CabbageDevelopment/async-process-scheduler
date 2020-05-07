@@ -19,26 +19,17 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-import warnings
-from queue import Queue
-from threading import Thread
-
-from scheduler.Task import Task
+from scheduler.Scheduler import Scheduler
+from test import impl
 
 
-class ThreadTask(Task):
-    def __init__(self, thread: Thread, queue: Queue, exc_queue=None, subtasks: int = 0):
-        # stdout queue is not necessary for thread tasks.
-        super(ThreadTask, self).__init__(queue, exc_queue, None, subtasks)
+def scheduler():
+    return Scheduler(capture_stdout=True)
 
-        self.thread = thread
 
-    def start(self) -> None:
-        if not self.running and not self.finished:
-            self.thread.start()
-            self.running = True
+def test_stdout():
+    impl.test_stdout(scheduler())
 
-    def terminate(self) -> None:
-        warnings.warn(f"Cannot terminate a thread task.", RuntimeWarning)
 
-        self.running = False
+if __name__ == "__main__":
+    test_stdout()

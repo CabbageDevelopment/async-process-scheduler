@@ -20,6 +20,7 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class Task(ABC):
@@ -28,15 +29,17 @@ class Task(ABC):
     passed to the process, so that the process can put its output in the queue.
     """
 
-    def __init__(self, queue, exc_queue=None, subtasks: int = 0):
+    def __init__(self, queue, exc_queue=None, stdout_queue=None, subtasks: int = 0):
         """
-
         :param queue: Queue for data to be passed.
         :param exc_queue: Queue for exceptions to be passed.
         :param subtasks: Number of subtasks.
         """
         self.queue = queue
         self.exc_queue = exc_queue
+
+        self.stdout_queue = stdout_queue
+        self.stdout_text = None
 
         self.running = False
         self.finished = False
@@ -89,3 +92,29 @@ class Task(ABC):
         Returns whether the task has raised an exception.
         """
         return self.exc_queue and not self.exc_queue.empty()
+
+    def has_stdout(self) -> bool:
+        """
+        Returns whether the task has provided any `stdout`.
+        """
+        return self.stdout_queue and not self.stdout_queue.empty()
+
+    def get_stdout(self) -> Optional[str]:
+        """
+        Returns the `stdout` from the task.
+        """
+        text = self.stdout_text or ""
+        if self.has_stdout():
+            lines = self.stdout_queue.get()
+
+            if lines:
+                if isinstance(lines, tuple):
+                    lines = "\n".join(lines)
+
+                text = f"{text}{lines}"
+
+        if text:
+            self.stdout_text = None
+            return text
+
+        return None
