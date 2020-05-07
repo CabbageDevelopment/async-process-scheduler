@@ -22,11 +22,13 @@
 
 import asyncio
 import functools
+import logging
 import multiprocessing
 import sys
 import threading
 import time
 import traceback
+import warnings
 from multiprocessing import cpu_count, Process, Queue
 from queue import Queue as MTQueue
 from typing import List, Callable, Type, Optional, Union, Any, Tuple, Iterable
@@ -62,6 +64,7 @@ class Scheduler:
         shared_memory_threshold: int = 1e7,
         run_in_thread: bool = False,
         raise_exceptions: bool = False,
+        error_callback: Callable[[str], None] = None,
         capture_stdout: bool = False,
     ):
         """
@@ -81,9 +84,11 @@ class Scheduler:
         the process which the Scheduler was started in.
         :param capture_stdout: if True, `stdout` from processes will be captured and written to the main process'
         `stdout`.
+        :param error_callback: a function which takes the traceback of a task's exception, as a string.
         """
         self.raise_exceptions = raise_exceptions
         self.capture_stdout = capture_stdout
+        self.error_callback = error_callback
 
         self.run_in_thread = run_in_thread
         if self.run_in_thread and shared_memory:
@@ -443,7 +448,17 @@ class Scheduler:
                 self.failed = True
 
                 if t.exception_tb:
-                    raise TaskFailedException(t.exception_tb)
+                    self.output = []
+                    self.failed = True
+                    self.terminate()
+
+                    exception = TaskFailedException(t.exception_tb)
+                    logging.error(exception)
+
+                    if self.error_callback:
+                        self.error_callback(t.exception_tb)
+
+                    raise exception
                 else:
                     raise SchedulerException(
                         f"Task failed, but no exception was raised: {t}"
