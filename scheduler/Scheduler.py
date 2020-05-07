@@ -596,6 +596,9 @@ def wrapper(
         queue.put(out)
 
     except Exception as e:
+        if stdout:
+            stdout.update(force=True)
+
         if exc_queue:
             tb = (
                 f"{type(e)}\n"
