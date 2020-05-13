@@ -63,6 +63,7 @@ class Scheduler:
         shared_memory: bool = False,
         shared_memory_threshold: int = 1e7,
         run_in_thread: bool = False,
+        only_threads: bool = False,
         raise_exceptions: bool = False,
         error_callback: Callable[[str], None] = None,
         capture_stdout: bool = False,
@@ -80,6 +81,7 @@ class Scheduler:
         using shared memory if possible
         :param run_in_thread: if True, a single task will be run in a thread instead of a process. This reduces
         the overhead (caused by spawning processes instead of forking) on Windows/macOS systems
+        :param only_threads: if True, all tasks will be run in threads
         :param raise_exceptions: if True, Exceptions raised in processes will also be raised in
         the process which the Scheduler was started in.
         :param capture_stdout: if True, `stdout` from processes will be captured and written to the main process'
@@ -91,9 +93,10 @@ class Scheduler:
         self.error_callback = error_callback
 
         self.run_in_thread = run_in_thread
-        if self.run_in_thread and shared_memory:
+        self.only_threads = only_threads
+        if (self.run_in_thread or self.only_threads) and shared_memory:
             raise SchedulerException(
-                f"Shared memory cannot currently be used when 'run_in_thread' is True."
+                f"Shared memory cannot currently be used when 'run_in_thread' or 'only_threads' is True."
             )
 
         self.dynamic = dynamic
@@ -182,7 +185,7 @@ class Scheduler:
                 "add_function() cannot be called on a scheduler which has already been started."
             )
 
-        thread = self.run_in_thread and len(self.tasks) == 0
+        thread = self.only_threads or (self.run_in_thread and len(self.tasks) == 0)
 
         if thread:
             queue = MTQueue()
